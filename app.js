@@ -937,6 +937,8 @@ const Services = {
         try {
             const brasao = await Reports.loadBrasao();
             const today = new Date().toLocaleDateString('pt-BR');
+            const protocolo = Reports.generateProtocol();
+            const emitidoPor = AppState.currentUser ? AppState.currentUser.nome || AppState.currentUser.usuario : '';
             const dataSolic = service.data_servico   ? new Date(service.data_servico).toLocaleDateString('pt-BR')   : '-';
             const dataConc  = service.data_conclusao ? new Date(service.data_conclusao).toLocaleDateString('pt-BR') : '-';
             const statusLabel = service.status === 'pending' ? 'Pendente' : 'Concluído';
@@ -960,19 +962,17 @@ const Services = {
         .text-block { background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 4px;
                       padding: 12px 14px; font-size: 13px; line-height: 1.75; white-space: pre-wrap;
                       word-break: break-word; color: #333; margin: 0; }
-        .lbl { font-size: 10px; text-transform: uppercase; letter-spacing: 0.6px;
-               color: #888; display: block; margin-bottom: 2px; }
-        .val { font-size: 13px; color: #222; font-weight: 600; }
     </style>
 </head>
 <body>
     ${headerHtml}
 
     <div style="display:flex;justify-content:space-between;margin-bottom:18px;align-items:flex-end;">
-        <h2 style="margin:0;font-size:16px;color:#1a2744;">Relatório de Serviço</h2>
+        <h2 style="margin:0;font-size:16px;color:#1a2744;">Ordem de Serviço</h2>
         <div style="text-align:right;">
+            <span style="font-size:13px;font-weight:700;color:#1a2744;display:block;letter-spacing:0.5px;">C.I/O.S Nº ${protocolo}</span>
             <span style="font-size:11px;color:#777;display:block;">Emitido em: ${today}</span>
-            ${AppState.currentUser ? `<span style="font-size:11px;color:#777;display:block;">Emitido por: ${AppState.currentUser.nome || AppState.currentUser.usuario}</span>` : ''}
+            ${emitidoPor ? `<span style="font-size:11px;color:#777;display:block;">Emitido por: ${emitidoPor}</span>` : ''}
         </div>
     </div>
 
@@ -1107,6 +1107,7 @@ const Reports = {
         this._bindEstoque();
         this._bindServicos();
         this._bindPedido();
+        this._bindFolha();
     },
 
     _bindSubtabs() {
@@ -1128,6 +1129,11 @@ const Reports = {
     _bindServicos() {
         const btn = document.getElementById('btnGerarServicos');
         if (btn) btn.onclick = () => this.gerarServicos();
+    },
+
+    _bindFolha() {
+        const btn = document.getElementById('btnGerarFolha');
+        if (btn) btn.onclick = () => this.gerarFolhaEmBranco();
     },
 
     _bindPedido() {
@@ -1235,6 +1241,13 @@ const Reports = {
 
     // ---- PDF GENERATION ----
 
+    generateProtocol() {
+        const year = new Date().getFullYear();
+        // 6-digit random number padded with zeros
+        const num = String(Math.floor(Math.random() * 999999) + 1).padStart(6, '0');
+        return `${num}/${year}`;
+    },
+
     async _buildPdfHeader(brasao) {
         let headerHtml = '<div style="text-align:center;margin-bottom:24px;border-bottom:2px solid #1a2744;padding-bottom:16px;">';
         if (brasao) {
@@ -1294,12 +1307,17 @@ const Reports = {
 
             const today = new Date().toLocaleDateString('pt-BR');
             const emitidoPorEstoque = AppState.currentUser ? AppState.currentUser.nome || AppState.currentUser.usuario : '';
+            const protocoloEstoque = this.generateProtocol();
             const headerHtml = await this._buildPdfHeader(brasao);
             const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><style>body{font-family:Arial,sans-serif;margin:40px;color:#222;}table{width:100%;border-collapse:collapse;}th{background:#1a2744;color:#fff;padding:10px 12px;font-size:13px;text-align:left;}th:last-child{text-align:center;width:100px;}</style></head><body>
             ${headerHtml}
             <div style="display:flex;justify-content:space-between;margin-bottom:16px;align-items:flex-end;">
                 <h2 style="margin:0;font-size:16px;color:#1a2744;">Relatório de Estoque</h2>
-                <div style="text-align:right;"><span style="font-size:11px;color:#777;display:block;">Emitido em: ${today}</span>${emitidoPorEstoque ? `<span style="font-size:11px;color:#777;display:block;">Emitido por: ${emitidoPorEstoque}</span>` : ''}</div>
+                <div style="text-align:right;">
+                    <span style="font-size:12px;font-weight:700;color:#1a2744;display:block;letter-spacing:0.5px;">Protocolo Nº ${protocoloEstoque}</span>
+                    <span style="font-size:11px;color:#777;display:block;">Emitido em: ${today}</span>
+                    ${emitidoPorEstoque ? `<span style="font-size:11px;color:#777;display:block;">Emitido por: ${emitidoPorEstoque}</span>` : ''}
+                </div>
             </div>
             <table>
                 <thead><tr><th>Nome do Item</th><th style="text-align:center;">Quantidade</th></tr></thead>
@@ -1344,12 +1362,17 @@ const Reports = {
 
             if (!tableRows) tableRows = '<tr><td colspan="6" style="text-align:center;padding:20px;color:#999;font-size:13px;">Nenhum serviço encontrado</td></tr>';
 
+            const protocoloServicos = this.generateProtocol();
             const headerHtml = await this._buildPdfHeader(brasao);
             const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><style>body{font-family:Arial,sans-serif;margin:40px;color:#222;}table{width:100%;border-collapse:collapse;}th{background:#1a2744;color:#fff;padding:10px 10px;font-size:12px;text-align:left;}</style></head><body>
             ${headerHtml}
             <div style="display:flex;justify-content:space-between;margin-bottom:16px;align-items:flex-end;">
                 <h2 style="margin:0;font-size:16px;color:#1a2744;">Relatório de Serviços</h2>
-                <div style="text-align:right;"><span style="font-size:11px;color:#777;display:block;">Emitido em: ${today}</span>${emitidoPorServicos ? `<span style="font-size:11px;color:#777;display:block;">Emitido por: ${emitidoPorServicos}</span>` : ''}</div>
+                <div style="text-align:right;">
+                    <span style="font-size:12px;font-weight:700;color:#1a2744;display:block;letter-spacing:0.5px;">Protocolo Nº ${protocoloServicos}</span>
+                    <span style="font-size:11px;color:#777;display:block;">Emitido em: ${today}</span>
+                    ${emitidoPorServicos ? `<span style="font-size:11px;color:#777;display:block;">Emitido por: ${emitidoPorServicos}</span>` : ''}
+                </div>
             </div>
             <table>
                 <thead><tr><th>Título</th><th>Setor/Cliente</th><th style="width:110px;">Data de Solicitação</th><th style="width:110px;">Data de Conclusão</th><th style="width:90px;">Status</th><th>Descrição</th></tr></thead>
@@ -1385,12 +1408,17 @@ const Reports = {
             </tr>`;
         }).join('');
 
+        const protocoloPedido = this.generateProtocol();
         const headerHtml = await this._buildPdfHeader(brasao);
         const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><style>body{font-family:Arial,sans-serif;margin:40px;color:#222;}table{width:100%;border-collapse:collapse;}th{background:#1a2744;color:#fff;padding:10px 12px;font-size:13px;text-align:left;}</style></head><body>
         ${headerHtml}
         <div style="display:flex;justify-content:space-between;margin-bottom:16px;align-items:flex-end;">
             <h2 style="margin:0;font-size:16px;color:#1a2744;">Pedido de Reposição de Estoque</h2>
-            <div style="text-align:right;"><span style="font-size:11px;color:#777;display:block;">Emitido em: ${today}</span>${emitidoPorPedido ? `<span style="font-size:11px;color:#777;display:block;">Emitido por: ${emitidoPorPedido}</span>` : ''}</div>
+            <div style="text-align:right;">
+                <span style="font-size:12px;font-weight:700;color:#1a2744;display:block;letter-spacing:0.5px;">C.I/O.S Nº ${protocoloPedido}</span>
+                <span style="font-size:11px;color:#777;display:block;">Emitido em: ${today}</span>
+                ${emitidoPorPedido ? `<span style="font-size:11px;color:#777;display:block;">Emitido por: ${emitidoPorPedido}</span>` : ''}
+            </div>
         </div>
         <table>
             <thead><tr><th style="width:40px;">#</th><th>Nome do Produto</th><th>Especificações</th><th>Descrição</th><th style="width:80px;text-align:center;">Qtd</th><th style="width:110px;text-align:center;">Nível</th></tr></thead>
@@ -1402,16 +1430,92 @@ const Reports = {
         this._printHtml(html, 'Pedido_Reposicao');
     },
 
+    async gerarFolhaEmBranco() {
+        const brasao = await this.loadBrasao();
+        const today = new Date().toLocaleDateString('pt-BR');
+        const protocolo = this.generateProtocol();
+        const emitidoPor = AppState.currentUser ? AppState.currentUser.nome || AppState.currentUser.usuario : '';
+        const headerHtml = await this._buildPdfHeader(brasao);
+
+        // 18 blank lines for handwriting
+        const linhas = Array.from({length: 18}, () =>
+            `<div style="border-bottom:1px solid #ccc;height:28px;margin-bottom:0;"></div>`
+        ).join('');
+
+        const html = `<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <style>
+        body { font-family: Arial, sans-serif; margin: 40px; color: #222; }
+        @media print { body { margin: 30px; } }
+    </style>
+</head>
+<body>
+    ${headerHtml}
+
+    <div style="display:flex;justify-content:space-between;margin-bottom:24px;align-items:flex-end;">
+        <h2 style="margin:0;font-size:16px;color:#1a2744;">Relatório / Ordem de Serviço</h2>
+        <div style="text-align:right;">
+            <span style="font-size:13px;font-weight:700;color:#1a2744;display:block;letter-spacing:0.5px;">C.I/O.S Nº ${protocolo}</span>
+            <span style="font-size:11px;color:#777;display:block;">Emitido em: ${today}</span>
+            ${emitidoPor ? `<span style="font-size:11px;color:#777;display:block;">Emitido por: ${emitidoPor}</span>` : ''}
+        </div>
+    </div>
+
+    <!-- Campos de cabeçalho para preencher -->
+    <table style="width:100%;border-collapse:collapse;margin-bottom:20px;">
+        <tr>
+            <td style="padding:6px 8px;border:1px solid #ccc;width:50%;">
+                <span style="font-size:9px;text-transform:uppercase;letter-spacing:0.5px;color:#888;">Setor / Solicitante</span>
+                <div style="height:20px;"></div>
+            </td>
+            <td style="padding:6px 8px;border:1px solid #ccc;width:25%;">
+                <span style="font-size:9px;text-transform:uppercase;letter-spacing:0.5px;color:#888;">Data de Solicitação</span>
+                <div style="height:20px;"></div>
+            </td>
+            <td style="padding:6px 8px;border:1px solid #ccc;width:25%;">
+                <span style="font-size:9px;text-transform:uppercase;letter-spacing:0.5px;color:#888;">Prioridade</span>
+                <div style="height:20px;"></div>
+            </td>
+        </tr>
+        <tr>
+            <td colspan="3" style="padding:6px 8px;border:1px solid #ccc;">
+                <span style="font-size:9px;text-transform:uppercase;letter-spacing:0.5px;color:#888;">Título / Assunto</span>
+                <div style="height:20px;"></div>
+            </td>
+        </tr>
+    </table>
+
+    <!-- Área de descrição / anotações -->
+    <div style="border:1px solid #1a2744;border-radius:4px;padding:10px 12px;margin-bottom:20px;">
+        <div style="font-size:9px;text-transform:uppercase;letter-spacing:0.5px;color:#1a2744;font-weight:700;margin-bottom:8px;border-bottom:1px solid #e5e7eb;padding-bottom:4px;">Descrição / Atividades Realizadas</div>
+        ${linhas}
+    </div>
+
+    <!-- Área de observações -->
+    <div style="border:1px solid #ccc;border-radius:4px;padding:10px 12px;margin-bottom:20px;">
+        <div style="font-size:9px;text-transform:uppercase;letter-spacing:0.5px;color:#888;margin-bottom:8px;">Observações</div>
+        ${Array.from({length:4}, () => `<div style="border-bottom:1px solid #eee;height:24px;"></div>`).join('')}
+    </div>
+
+    ${this._buildPdfFooter()}
+</body>
+</html>`;
+
+        this._printHtml(html, 'Folha_Servico');
+    },
+
     _printHtml(html, filename) {
-        const win = window.open('', '_blank', 'width=900,height=700');
+        const win = window.open('', '_blank', 'width=960,height=750');
         if (!win) { Toast.show('Permita popups para gerar o PDF!', 'error'); return; }
+        win.document.open();
         win.document.write(html);
         win.document.close();
-        win.onload = () => {
-            setTimeout(() => {
-                win.print();
-            }, 500);
-        };
+        // onload is unreliable after document.write — use timeout instead
+        setTimeout(() => {
+            try { win.focus(); win.print(); } catch(e) { console.error('print error:', e); }
+        }, 800);
     }
 };
 
