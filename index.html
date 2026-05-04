@@ -14,7 +14,6 @@
     
     <!-- Tela de Login -->
     <div class="login-screen" id="loginScreen">
-        
         <div class="login-container">
             <div class="login-header">
                 <svg class="login-logo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -500,6 +499,13 @@
                         </svg>
                         Criar Relatório
                     </button>
+                    <button class="report-subtab" data-report="folha">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                            <polyline points="14 2 14 8 20 8"/>
+                        </svg>
+                        Folha em Branco
+                    </button>
                 </div>
 
                 <!-- ESTOQUE REPORT PANEL -->
@@ -628,6 +634,30 @@
                                     <p>Nenhum item adicionado ainda</p>
                                 </div>
                             </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- FOLHA EM BRANCO PANEL -->
+                <div class="report-panel" id="report-panel-folha">
+                    <div class="report-preview-header">
+                        <p class="report-desc">Gera uma folha em branco com protocolo C.I/O.S, cabeçalho oficial e campos para preenchimento manual.</p>
+                        <button class="btn btn-primary" id="btnGerarFolha">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                                <polyline points="7 10 12 15 17 10"/>
+                                <line x1="12" y1="15" x2="12" y2="3"/>
+                            </svg>
+                            Gerar Folha em Branco
+                        </button>
+                    </div>
+                    <div class="report-preview-box">
+                        <div class="report-preview-empty">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                                <polyline points="14 2 14 8 20 8"/>
+                            </svg>
+                            <p>Clique em "Gerar Folha em Branco" para imprimir uma folha com protocolo para preenchimento manual</p>
                         </div>
                     </div>
                 </div>
