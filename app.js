@@ -1438,7 +1438,7 @@ const Reports = {
         ${this._buildPdfFooter()}
         </body></html>`;
 
-        SavedReports.save('pedido', titulo, protocolo, data, html);
+        SavedReports.save('pedido', 'Pedido de Reposição de Estoque', protocoloPedido, today, html);
         this._printHtml(html, 'Pedido_Reposicao');
     },
 
