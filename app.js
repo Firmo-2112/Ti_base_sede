@@ -1269,7 +1269,7 @@ const Reports = {
 
     _buildPdfFooter() {
         return `
-        <div style="margin-top:28px;padding-top:10px;">
+        <div style="margin-top:14px;padding-top:4px;">
             <div style="display:flex;justify-content:space-between;gap:24px;flex-wrap:wrap;">
                 <div style="flex:1;min-width:160px;text-align:center;">
                     <div style="border-top:1px solid #333;padding-top:8px;margin-top:40px;font-size:12px;color:#333;">Assinatura do Responsável</div>
@@ -1503,12 +1503,12 @@ const Reports = {
     <!-- Descrição -->
     <div class="sec">
         <span class="sec-lbl">Descrição do Serviço / Problema Relatado</span>
-        ${mkLinhas(7)}
+        ${mkLinhas(9)}
     </div>
     <!-- Atividades Realizadas -->
     <div class="sec">
         <span class="sec-lbl">Atividades Realizadas</span>
-        ${mkLinhas(7)}
+        ${mkLinhas(9)}
     </div>
     ${this._buildPdfFooter()}
 </body>
