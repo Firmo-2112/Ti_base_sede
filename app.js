@@ -1503,7 +1503,7 @@ const Reports = {
     <!-- Descrição -->
     <div class="sec">
         <span class="sec-lbl">Descrição do Serviço / Problema Relatado</span>
-        ${mkLinhas(9)}
+        ${mkLinhas(7)}
     </div>
     <!-- Atividades Realizadas -->
     <div class="sec">
