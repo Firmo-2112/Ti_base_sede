@@ -970,7 +970,7 @@ const Services = {
     <div style="display:flex;justify-content:space-between;margin-bottom:18px;align-items:flex-end;">
         <h2 style="margin:0;font-size:16px;color:#1a2744;">Ordem de Serviço</h2>
         <div style="text-align:right;">
-            <span style="font-size:13px;font-weight:700;color:#1a2744;display:block;letter-spacing:0.5px;">C.I/O.S Nº ${protocolo}</span>
+            <span style="font-size:13px;font-weight:700;color:#1a2744;display:block;letter-spacing:0.5px;">Protocolo Nº ${protocolo}</span>
             <span style="font-size:11px;color:#777;display:block;">Emitido em: ${today}</span>
             ${emitidoPor ? `<span style="font-size:11px;color:#777;display:block;">Emitido por: ${emitidoPor}</span>` : ''}
         </div>
@@ -1426,7 +1426,7 @@ const Reports = {
         <div style="display:flex;justify-content:space-between;margin-bottom:16px;align-items:flex-end;">
             <h2 style="margin:0;font-size:16px;color:#1a2744;">Pedido de Reposição de Estoque</h2>
             <div style="text-align:right;">
-                <span style="font-size:12px;font-weight:700;color:#1a2744;display:block;letter-spacing:0.5px;">C.I/O.S Nº ${protocoloPedido}</span>
+                <span style="font-size:12px;font-weight:700;color:#1a2744;display:block;letter-spacing:0.5px;">Protocolo Nº ${protocoloPedido}</span>
                 <span style="font-size:11px;color:#777;display:block;">Emitido em: ${today}</span>
                 ${emitidoPorPedido ? `<span style="font-size:11px;color:#777;display:block;">Emitido por: ${emitidoPorPedido}</span>` : ''}
             </div>
@@ -1438,7 +1438,7 @@ const Reports = {
         ${this._buildPdfFooter()}
         </body></html>`;
 
-        SavedReports.save('pedido', 'Pedido de Reposição de Estoque', protocoloPedido, today, html);
+        SavedReports.save('pedido', 'Relatório Criado', protocoloPedido, today, html);
         this._printHtml(html, 'Pedido_Reposicao');
     },
 
@@ -1473,7 +1473,7 @@ const Reports = {
     <div style="display:flex;justify-content:space-between;margin-bottom:20px;align-items:flex-end;">
         <h2 style="margin:0;font-size:16px;color:#1a2744;">Relatório / Ordem de Serviço</h2>
         <div style="text-align:right;">
-            <span style="font-size:13px;font-weight:700;color:#1a2744;display:block;letter-spacing:0.5px;">C.I/O.S Nº ${protocolo}</span>
+            <span style="font-size:13px;font-weight:700;color:#1a2744;display:block;letter-spacing:0.5px;">Protocolo Nº ${protocolo}</span>
             <span style="font-size:11px;color:#777;display:block;">Emitido em: ${today}</span>
             ${emitidoPor ? `<span style="font-size:11px;color:#777;display:block;">Emitido por: ${emitidoPor}</span>` : ''}
         </div>
