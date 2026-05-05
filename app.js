@@ -1116,9 +1116,17 @@ const Reports = {
                 document.querySelectorAll('.report-subtab').forEach(b => b.classList.remove('active'));
                 document.querySelectorAll('.report-panel').forEach(p => p.classList.remove('active'));
                 btn.classList.add('active');
-                document.getElementById('report-panel-' + btn.dataset.report).classList.add('active');
+                const panel = document.getElementById('report-panel-' + btn.dataset.report);
+                if (panel) panel.classList.add('active');
+                if (btn.dataset.report === 'salvos') SavedReports.render();
             };
         });
+        const btnLimpar = document.getElementById('btnLimparSalvos');
+        if (btnLimpar) btnLimpar.onclick = () => {
+            if (confirm('Limpar todo o histórico de relatórios salvos?')) {
+                SavedReports.clearAll();
+            }
+        };
     },
 
     _bindEstoque() {
@@ -1132,8 +1140,9 @@ const Reports = {
     },
 
     _bindFolha() {
-        const btn = document.getElementById('btnGerarFolha');
-        if (btn) btn.onclick = () => this.gerarFolhaEmBranco();
+        // "Folha em Branco" button that lives inside the Serviços panel
+        const btnF = document.getElementById('btnGerarFolhaServicos');
+        if (btnF) btnF.onclick = () => this.gerarFolhaEmBranco();
     },
 
     _bindPedido() {
@@ -1326,6 +1335,7 @@ const Reports = {
             ${this._buildPdfFooter()}
             </body></html>`;
 
+            SavedReports.save('estoque', 'Relatório de Estoque', protocoloEstoque, today, html);
             this._printHtml(html, 'Relatorio_Estoque');
         } catch(e) {
             Toast.show('Erro ao gerar relatório!', 'error');
@@ -1381,6 +1391,7 @@ const Reports = {
             ${this._buildPdfFooter()}
             </body></html>`;
 
+            SavedReports.save('servicos', 'Relatório de Serviços', protocoloServicos, today, html);
             this._printHtml(html, 'Relatorio_Servicos');
         } catch(e) {
             Toast.show('Erro ao gerar relatório!', 'error');
@@ -1437,24 +1448,28 @@ const Reports = {
         const emitidoPor = AppState.currentUser ? AppState.currentUser.nome || AppState.currentUser.usuario : '';
         const headerHtml = await this._buildPdfHeader(brasao);
 
-        // 18 blank lines for handwriting
-        const linhas = Array.from({length: 18}, () =>
-            `<div style="border-bottom:1px solid #ccc;height:28px;margin-bottom:0;"></div>`
-        ).join('');
+        const mkLinhas = (n, h = 26) => Array.from({length: n}, () =>
+            `<div style="border-bottom:1px solid #ccc;height:${h}px;"></div>`).join('');
 
         const html = `<!DOCTYPE html>
 <html>
 <head>
     <meta charset="utf-8">
     <style>
-        body { font-family: Arial, sans-serif; margin: 40px; color: #222; }
-        @media print { body { margin: 30px; } }
+        body { font-family: Arial, sans-serif; margin: 36px; color: #222; }
+        .sec { border:1px solid #1a2744;border-radius:4px;padding:10px 12px;margin-bottom:16px; }
+        .sec-obs { border:1px solid #ccc;border-radius:4px;padding:10px 12px;margin-bottom:16px; }
+        .sec-lbl { font-size:9px;text-transform:uppercase;letter-spacing:0.5px;color:#1a2744;
+                   font-weight:700;margin-bottom:8px;border-bottom:1px solid #e5e7eb;padding-bottom:4px;display:block; }
+        .sec-obs-lbl { font-size:9px;text-transform:uppercase;letter-spacing:0.5px;color:#888;
+                       margin-bottom:8px;display:block; }
+        @media print { body { margin:28px; } }
     </style>
 </head>
 <body>
     ${headerHtml}
 
-    <div style="display:flex;justify-content:space-between;margin-bottom:24px;align-items:flex-end;">
+    <div style="display:flex;justify-content:space-between;margin-bottom:20px;align-items:flex-end;">
         <h2 style="margin:0;font-size:16px;color:#1a2744;">Relatório / Ordem de Serviço</h2>
         <div style="text-align:right;">
             <span style="font-size:13px;font-weight:700;color:#1a2744;display:block;letter-spacing:0.5px;">C.I/O.S Nº ${protocolo}</span>
@@ -1463,8 +1478,8 @@ const Reports = {
         </div>
     </div>
 
-    <!-- Campos de cabeçalho para preencher -->
-    <table style="width:100%;border-collapse:collapse;margin-bottom:20px;">
+    <!-- Cabeçalho -->
+    <table style="width:100%;border-collapse:collapse;margin-bottom:16px;">
         <tr>
             <td style="padding:6px 8px;border:1px solid #ccc;width:50%;">
                 <span style="font-size:9px;text-transform:uppercase;letter-spacing:0.5px;color:#888;">Setor / Solicitante</span>
@@ -1487,16 +1502,22 @@ const Reports = {
         </tr>
     </table>
 
-    <!-- Área de descrição / anotações -->
-    <div style="border:1px solid #1a2744;border-radius:4px;padding:10px 12px;margin-bottom:20px;">
-        <div style="font-size:9px;text-transform:uppercase;letter-spacing:0.5px;color:#1a2744;font-weight:700;margin-bottom:8px;border-bottom:1px solid #e5e7eb;padding-bottom:4px;">Descrição / Atividades Realizadas</div>
-        ${linhas}
+    <!-- Descrição -->
+    <div class="sec">
+        <span class="sec-lbl">Descrição do Serviço / Problema Relatado</span>
+        ${mkLinhas(8)}
     </div>
 
-    <!-- Área de observações -->
-    <div style="border:1px solid #ccc;border-radius:4px;padding:10px 12px;margin-bottom:20px;">
-        <div style="font-size:9px;text-transform:uppercase;letter-spacing:0.5px;color:#888;margin-bottom:8px;">Observações</div>
-        ${Array.from({length:4}, () => `<div style="border-bottom:1px solid #eee;height:24px;"></div>`).join('')}
+    <!-- Atividades Realizadas -->
+    <div class="sec">
+        <span class="sec-lbl">Atividades Realizadas</span>
+        ${mkLinhas(8)}
+    </div>
+
+    <!-- Observações -->
+    <div class="sec-obs">
+        <span class="sec-obs-lbl">Observações</span>
+        ${mkLinhas(4)}
     </div>
 
     ${this._buildPdfFooter()}
@@ -1516,6 +1537,106 @@ const Reports = {
         setTimeout(() => {
             try { win.focus(); win.print(); } catch(e) { console.error('print error:', e); }
         }, 800);
+    }
+};
+
+// ==========================================
+// RELATÓRIOS SALVOS (localStorage)
+// ==========================================
+const SavedReports = {
+    KEY: 'setorTI_savedReports',
+
+    load() {
+        try {
+            const raw = localStorage.getItem(this.KEY);
+            return raw ? JSON.parse(raw) : [];
+        } catch(e) { return []; }
+    },
+
+    save(tipo, titulo, protocolo, data, html) {
+        const list = this.load();
+        // Limit to 30 saved reports
+        if (list.length >= 30) list.splice(0, list.length - 29);
+        list.push({
+            id:        Date.now(),
+            tipo,
+            titulo,
+            protocolo,
+            data,
+            geradoEm:  new Date().toISOString(),
+            html
+        });
+        try {
+            localStorage.setItem(this.KEY, JSON.stringify(list));
+            Toast.show('Relatório salvo no histórico!', 'success');
+        } catch(e) {
+            Toast.show('Não foi possível salvar (armazenamento cheio).', 'error');
+        }
+    },
+
+    remove(id) {
+        const list = this.load().filter(r => r.id !== id);
+        localStorage.setItem(this.KEY, JSON.stringify(list));
+        this.render();
+    },
+
+    clearAll() {
+        localStorage.removeItem(this.KEY);
+        this.render();
+        Toast.show('Histórico limpo!', 'info');
+    },
+
+    reopen(id) {
+        const item = this.load().find(r => r.id === id);
+        if (!item) return;
+        Reports._printHtml(item.html, item.titulo.replace(/\s+/g,'_'));
+    },
+
+    render() {
+        const container = document.getElementById('savedReportsList');
+        if (!container) return;
+        const list = this.load();
+        if (list.length === 0) {
+            container.innerHTML = `
+                <div class="report-preview-empty">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
+                        <polyline points="17 21 17 13 7 13 7 21"/>
+                    </svg>
+                    <p>Nenhum relatório salvo ainda. Gere um relatório de estoque ou serviços.</p>
+                </div>`;
+            return;
+        }
+        const icons = {
+            estoque:  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>',
+            servicos: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>'
+        };
+        // Newest first
+        const sorted = [...list].reverse();
+        container.innerHTML = sorted.map(r => {
+            const dt = new Date(r.geradoEm).toLocaleString('pt-BR');
+            const icon = icons[r.tipo] || icons.servicos;
+            const tagClass = r.tipo === 'estoque' ? 'tag-estoque' : 'tag-servicos';
+            return `<div class="saved-report-item">
+                <div class="saved-report-icon ${r.tipo}">${icon}</div>
+                <div class="saved-report-info">
+                    <span class="saved-report-title">${r.titulo}</span>
+                    <span class="saved-report-meta">
+                        <span class="saved-report-tag ${tagClass}">${r.tipo === 'estoque' ? 'Estoque' : 'Serviços'}</span>
+                        Protocolo <strong>${r.protocolo}</strong> &nbsp;·&nbsp; ${dt}
+                    </span>
+                </div>
+                <div class="saved-report-actions">
+                    <button class="btn btn-sm btn-primary" onclick="SavedReports.reopen(${r.id})" title="Reabrir PDF">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                        Abrir
+                    </button>
+                    <button class="btn btn-sm btn-danger" onclick="SavedReports.remove(${r.id})" title="Excluir">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px;"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                    </button>
+                </div>
+            </div>`;
+        }).join('');
     }
 };
 
