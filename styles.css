@@ -2536,3 +2536,99 @@ html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
 .activity-action-verb.edit     { background: var(--primary-dim);  color: var(--primary); }
 .activity-action-verb.delete   { background: var(--danger-dim);   color: var(--danger);  }
 .activity-action-verb.complete { background: var(--accent-dim);   color: #a78bfa;        }
+
+/* ==========================================
+   SAVED REPORTS LIST
+   ========================================== */
+.saved-reports-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.625rem;
+    padding: 0.25rem 0;
+}
+
+.saved-report-item {
+    display: flex;
+    align-items: center;
+    gap: 0.875rem;
+    background: var(--bg-elevated);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    padding: 0.875rem 1rem;
+    transition: border-color var(--t-normal);
+}
+
+.saved-report-item:hover {
+    border-color: var(--border-bright);
+}
+
+.saved-report-icon {
+    width: 38px;
+    height: 38px;
+    border-radius: var(--radius-sm);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+.saved-report-icon svg { width: 18px; height: 18px; }
+.saved-report-icon.estoque  { background: var(--primary-dim);  color: var(--primary); }
+.saved-report-icon.servicos { background: var(--accent-dim);   color: #a78bfa; }
+
+.saved-report-info {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+}
+
+.saved-report-title {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--text-bright);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.saved-report-meta {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+    flex-wrap: wrap;
+}
+
+.saved-report-meta strong {
+    color: var(--text-primary);
+    font-weight: 600;
+}
+
+.saved-report-tag {
+    padding: 1px 7px;
+    border-radius: 10px;
+    font-size: 0.625rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+.tag-estoque  { background: var(--primary-dim);  color: var(--primary); }
+.tag-servicos { background: var(--accent-dim);   color: #a78bfa; }
+
+.saved-report-actions {
+    display: flex;
+    gap: 0.375rem;
+    flex-shrink: 0;
+}
+
+@media (max-width: 480px) {
+    .saved-report-item {
+        flex-wrap: wrap;
+    }
+    .saved-report-actions {
+        width: 100%;
+        justify-content: flex-end;
+    }
+}
