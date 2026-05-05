@@ -1,3 +1,4 @@
+// FUNDO BINÁRIO
 const canvas = document.getElementById('matrix');
 const ctx = canvas.getContext('2d'); 
 
@@ -10,6 +11,7 @@ const columns = canvas.width / fontSize;
 
 const drops = [];
 for(let x=0;x<columns;x++) drops[x]=1;
+
 function draw(){
 ctx.fillStyle = 'rgba(0,0,0,0.05)';
 ctx.fillRect(0,0,canvas.width,canvas.height);
@@ -968,7 +970,7 @@ const Services = {
     <div style="display:flex;justify-content:space-between;margin-bottom:18px;align-items:flex-end;">
         <h2 style="margin:0;font-size:16px;color:#1a2744;">Ordem de Serviço</h2>
         <div style="text-align:right;">
-            <span style="font-size:13px;font-weight:700;color:#1a2744;display:block;letter-spacing:0.5px;">Protocolo Nº ${protocolo}</span>
+            <span style="font-size:13px;font-weight:700;color:#1a2744;display:block;letter-spacing:0.5px;">C.I/O.S Nº ${protocolo}</span>
             <span style="font-size:11px;color:#777;display:block;">Emitido em: ${today}</span>
             ${emitidoPor ? `<span style="font-size:11px;color:#777;display:block;">Emitido por: ${emitidoPor}</span>` : ''}
         </div>
@@ -1424,7 +1426,7 @@ const Reports = {
         <div style="display:flex;justify-content:space-between;margin-bottom:16px;align-items:flex-end;">
             <h2 style="margin:0;font-size:16px;color:#1a2744;">Pedido de Reposição de Estoque</h2>
             <div style="text-align:right;">
-                <span style="font-size:12px;font-weight:700;color:#1a2744;display:block;letter-spacing:0.5px;">Protocolo Nº ${protocoloPedido}</span>
+                <span style="font-size:12px;font-weight:700;color:#1a2744;display:block;letter-spacing:0.5px;">C.I/O.S Nº ${protocoloPedido}</span>
                 <span style="font-size:11px;color:#777;display:block;">Emitido em: ${today}</span>
                 ${emitidoPorPedido ? `<span style="font-size:11px;color:#777;display:block;">Emitido por: ${emitidoPorPedido}</span>` : ''}
             </div>
@@ -1436,6 +1438,7 @@ const Reports = {
         ${this._buildPdfFooter()}
         </body></html>`;
 
+        SavedReports.save('pedido', titulo, protocolo, data, html);
         this._printHtml(html, 'Pedido_Reposicao');
     },
 
@@ -1470,7 +1473,7 @@ const Reports = {
     <div style="display:flex;justify-content:space-between;margin-bottom:20px;align-items:flex-end;">
         <h2 style="margin:0;font-size:16px;color:#1a2744;">Relatório / Ordem de Serviço</h2>
         <div style="text-align:right;">
-            <span style="font-size:13px;font-weight:700;color:#1a2744;display:block;letter-spacing:0.5px;">Protocolo Nº ${protocolo}</span>
+            <span style="font-size:13px;font-weight:700;color:#1a2744;display:block;letter-spacing:0.5px;">C.I/O.S Nº ${protocolo}</span>
             <span style="font-size:11px;color:#777;display:block;">Emitido em: ${today}</span>
             ${emitidoPor ? `<span style="font-size:11px;color:#777;display:block;">Emitido por: ${emitidoPor}</span>` : ''}
         </div>
@@ -1499,16 +1502,19 @@ const Reports = {
             </td>
         </tr>
     </table>
+
     <!-- Descrição -->
     <div class="sec">
         <span class="sec-lbl">Descrição do Serviço / Problema Relatado</span>
-        ${mkLinhas(7)}
+        ${mkLinhas(8)}
     </div>
+
     <!-- Atividades Realizadas -->
     <div class="sec">
         <span class="sec-lbl">Atividades Realizadas</span>
-        ${mkLinhas(9)}
+        ${mkLinhas(8)}
     </div>
+
     ${this._buildPdfFooter()}
 </body>
 </html>`;
@@ -1598,20 +1604,30 @@ const SavedReports = {
         }
         const icons = {
             estoque:  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>',
-            servicos: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>'
+            servicos: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>',
+            pedido:   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3h18v18H3z"/><path d="M8 12h8M8 8h8M8 16h5"/></svg>'
         };
         // Newest first
         const sorted = [...list].reverse();
         container.innerHTML = sorted.map(r => {
             const dt = new Date(r.geradoEm).toLocaleString('pt-BR');
             const icon = icons[r.tipo] || icons.servicos;
-            const tagClass = r.tipo === 'estoque' ? 'tag-estoque' : 'tag-servicos';
+            const tagClass = 
+            r.tipo === 'estoque' ? 'tag-estoque' :
+            r.tipo === 'servicos' ? 'tag-servicos' :
+            'tag-pedido';  
             return `<div class="saved-report-item">
                 <div class="saved-report-icon ${r.tipo}">${icon}</div>
                 <div class="saved-report-info">
                     <span class="saved-report-title">${r.titulo}</span>
                     <span class="saved-report-meta">
-                        <span class="saved-report-tag ${tagClass}">${r.tipo === 'estoque' ? 'Estoque' : 'Serviços'}</span>
+                        <span class="saved-report-tag ${tagClass}">
+                            ${
+                                r.tipo === 'estoque' ? 'Estoque' :
+                                r.tipo === 'servicos' ? 'Serviços' :
+                                'Relatório'
+                            }
+                        </span>
                         Protocolo <strong>${r.protocolo}</strong> &nbsp;·&nbsp; ${dt}
                     </span>
                 </div>
