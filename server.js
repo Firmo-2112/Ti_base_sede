@@ -41,6 +41,43 @@ const dbConfig = {
 const pool = mysql.createPool(dbConfig);
 
 // ==========================================
+// MIGRAÇÃO AUTOMÁTICA — cria tabelas ausentes
+// Roda toda vez que o servidor inicia
+// ==========================================
+async function runMigrations() {
+    try {
+        const conn = await pool.getConnection();
+
+        // Tabela solicitacoes
+        await conn.execute(`
+            CREATE TABLE IF NOT EXISTS solicitacoes (
+                id               INT NOT NULL AUTO_INCREMENT,
+                numero_so        VARCHAR(20)  NOT NULL,
+                titulo           VARCHAR(100) NOT NULL,
+                cliente_setor    VARCHAR(100) DEFAULT NULL,
+                descricao        TEXT         NOT NULL,
+                data_solicitacao DATE         DEFAULT NULL,
+                status           VARCHAR(20)  DEFAULT 'nova',
+                prioridade       VARCHAR(20)  DEFAULT NULL,
+                servico_id       INT          DEFAULT NULL,
+                data_criacao     DATETIME     DEFAULT CURRENT_TIMESTAMP,
+                data_atualizacao DATETIME     DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                PRIMARY KEY (id),
+                UNIQUE KEY unique_numero_so (numero_so),
+                KEY idx_sol_status (status),
+                KEY idx_sol_numero (numero_so),
+                KEY idx_sol_criacao (data_criacao)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+        `);
+
+        conn.release();
+        console.log('✅ Migrações executadas com sucesso');
+    } catch (err) {
+        console.error('⚠️  Erro nas migrações:', err.message);
+    }
+}
+
+// ==========================================
 // HEALTHCHECK — Railway precisa deste endpoint
 // ==========================================
 app.get('/health', (req, res) => {
@@ -493,15 +530,16 @@ app.get('*', (req, res) => {
 // Railway exige bind em 0.0.0.0 e usa PORT dinamicamente
 // ==========================================
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, '0.0.0.0', () => {
+app.listen(PORT, '0.0.0.0', async () => {
     console.log(`🚀 Setor de TI rodando na porta ${PORT}`);
-    pool.getConnection()
-        .then(conn => {
-            console.log('✅ Conectado ao banco de dados MySQL (Railway)');
-            conn.release();
-        })
-        .catch(err => {
-            console.error('⚠️  Banco de dados indisponível no momento:', err.message);
-            console.error('   O servidor HTTP continua rodando. Verifique as variáveis de ambiente.');
-        });
+    try {
+        const conn = await pool.getConnection();
+        console.log('✅ Conectado ao banco de dados MySQL (Railway)');
+        conn.release();
+        // Cria tabelas que ainda não existem
+        await runMigrations();
+    } catch (err) {
+        console.error('⚠️  Banco de dados indisponível no momento:', err.message);
+        console.error('   O servidor HTTP continua rodando. Verifique as variáveis de ambiente.');
+    }
 });
