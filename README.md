@@ -1,6 +1,7 @@
-# 🚀 TI System
+# 🚀 Ti Base System
 
 Sistema web em produção para gerenciamento e processamento de dados, hospedado na plataforma Railway com integração a banco de dados MySQL.
+
 
 ---
 
@@ -27,7 +28,7 @@ A aplicação está implantada em ambiente cloud, garantindo alta disponibilidad
 - MySQL  
 - HTML5, CSS3, JavaScript  
 - Railway (Deploy e Infraestrutura)
-  
+
 ---
 
 ### 🔐 2. Variáveis de Ambiente
@@ -121,4 +122,3 @@ O deploy é realizado automaticamente via Railway:
 ## 👨‍💻 Autor
 
 Marcos Firmino Cruz dos Santos
-

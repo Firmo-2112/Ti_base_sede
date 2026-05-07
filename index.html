@@ -4,16 +4,17 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Setor de TI - Gerenciador para Técnico de TI</title>
-    <link rel="stylesheet" href="styles.css?v=3">
+    <link rel="stylesheet" href="styles.css?v=4">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 </head>
 
 <body>
     <canvas id="matrix"></canvas>
     <script src="https://unpkg.com/@lottiefiles/lottie-player@latest/dist/lottie-player.js"></script>
-    
+
     <!-- Tela de Login -->
     <div class="login-screen" id="loginScreen">
+        
         <div class="login-container">
             <div class="login-header">
                 <svg class="login-logo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -75,7 +76,7 @@
                     <span class="logo-text">Setor de TI</span>
                 </div>
             </div>
-            
+
             <nav class="sidebar-nav">
                 <a href="#" class="nav-item active" data-tab="dashboard">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -111,6 +112,13 @@
                     <span>Serviços</span>
                     <span class="badge" id="servicesBadge">0</span>
                 </a>
+                <a href="#" class="nav-item" data-tab="solicitacoes">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                    </svg>
+                    <span>Solicitações de Serviço</span>
+                    <span class="badge" id="solicitacoesBadge" style="display:none">0</span>
+                </a>
                 <a href="#" class="nav-item" data-tab="reports">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M9 17H5a2 2 0 0 0-2 2v0a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v0a2 2 0 0 0-2-2h-4"/>
@@ -132,7 +140,7 @@
                 </a>
 
             </nav>
-            
+
             <div class="sidebar-footer">
                 <div class="theme-toggle-container">
                     <span class="theme-icon moon">
@@ -158,10 +166,6 @@
                         </svg>
                     </span>
                 </div>
-                <div class="user-identity">
-                    <div class="user-avatar" id="userAvatar">?</div>
-                    <span class="user-avatar-name" id="userAvatarName"></span>
-                </div>
                 <button class="logout-btn" id="logoutBtn" title="Sair">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
@@ -175,24 +179,16 @@
 
         <main class="main-content">
             <header class="mobile-header">
-                <button class="mobile-menu-btn" id="mobileMenuBtn" aria-label="Menu">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <line x1="3" y1="6" x2="21" y2="6"/>
-                        <line x1="3" y1="12" x2="21" y2="12"/>
-                        <line x1="3" y1="18" x2="21" y2="18"/>
-                    </svg>
-                </button>
                 <h1 class="mobile-title">Setor de TI</h1>
-                <div style="width:36px"></div>
             </header>
-            <div class="sidebar-backdrop" id="sidebarBackdrop"></div>
 
+            <!-- ==================== DASHBOARD ==================== -->
             <section class="tab-content active" id="dashboard-tab">
                 <div class="content-header">
                     <h2>Início</h2>
-                    <p class="subtitle"></p>
+                    <p class="subtitle">Visão geral do seu gerenciamento de TI</p>
                 </div>
-                
+
                 <div class="dashboard-grid">
                     <div class="stat-card">
                         <div class="stat-icon inventory-icon">
@@ -247,7 +243,6 @@
                 <div class="dashboard-sections">
                     <div class="dashboard-card">
                         <h3>Atividade de Estoque</h3>
-                        
                         <div class="activity-list" id="inventoryActivity">
                             <div class="empty-state">
                                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -260,7 +255,6 @@
                     </div>
                     <div class="dashboard-card">
                         <h3>Atividade de Serviços</h3>
-
                         <div class="activity-list" id="servicesActivity">
                             <div class="empty-state">
                                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -302,10 +296,11 @@
                 </div>
             </section>
 
+            <!-- ==================== ESTOQUE ==================== -->
             <section class="tab-content" id="inventory-tab">
                 <div class="content-header">
                     <h2>Gerenciador de Estoque</h2>
-                    <p class="subtitle"></p>
+                    <p class="subtitle">Controle de equipamentos, peças e suprimentos</p>
                 </div>
                 <div class="toolbar">
                     <div class="search-box">
@@ -367,10 +362,11 @@
                 </div>
             </section>
 
+            <!-- ==================== CÓDIGOS ==================== -->
             <section class="tab-content" id="snippets-tab">
                 <div class="content-header">
-                    <h2>Códigos CMD, PowerShell & Batch</h2>
-                    <p class="subtitle"></p>
+                    <h2>Códigos CMD & PowerShell</h2>
+                    <p class="subtitle">Biblioteca de comandos e scripts úteis</p>
                 </div>
                 <div class="toolbar">
                     <div class="search-box">
@@ -422,10 +418,11 @@
                 </div>
             </section>
 
+            <!-- ==================== SERVIÇOS ==================== -->
             <section class="tab-content" id="services-tab">
                 <div class="content-header">
                     <h2>Gerenciador de Serviços</h2>
-                    <p class="subtitle"></p>
+                    <p class="subtitle">Acompanhe atividades e serviços realizados</p>
                 </div>
                 <div class="toolbar">
                     <div class="search-box">
@@ -470,14 +467,47 @@
                 </div>
             </section>
 
-            <!-- ==================== RELATÓRIOS TAB ==================== -->
+            <!-- ==================== SOLICITAÇÕES ==================== -->
+            <section class="tab-content" id="solicitacoes-tab">
+                <div class="content-header">
+                    <h2>Solicitações de Serviço</h2>
+                    <p class="subtitle">Chamados recebidos pelo portal público</p>
+                </div>
+                <div class="toolbar">
+                    <div class="search-box">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="11" cy="11" r="8"/>
+                            <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+                        </svg>
+                        <input type="text" placeholder="Buscar solicitações..." id="solicitacoesSearch">
+                    </div>
+                    <div class="toolbar-actions">
+                        <select id="solicitacoesStatusFilter" class="filter-select">
+                            <option value="">Todos Status</option>
+                            <option value="nova">Novas</option>
+                            <option value="salvo">Convertidas</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="sol-list-container">
+                    <div class="sol-list" id="solicitacoesList"></div>
+                    <div class="empty-state-container" id="solicitacoesEmpty">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                        </svg>
+                        <h3>Nenhuma solicitação</h3>
+                        <p>As solicitações enviadas pelo portal público aparecerão aqui</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ==================== RELATÓRIOS ==================== -->
             <section class="tab-content" id="reports-tab">
                 <div class="content-header">
                     <h2>Relatórios</h2>
-                    <p class="subtitle"></p>
+                    <p class="subtitle">Gere e exporte relatórios em PDF</p>
                 </div>
 
-                <!-- Sub-tabs -->
                 <div class="reports-subtabs">
                     <button class="report-subtab active" data-report="estoque">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -499,20 +529,11 @@
                         </svg>
                         Criar Relatório
                     </button>
-                    <button class="report-subtab" data-report="salvos">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
-                            <polyline points="17 21 17 13 7 13 7 21"/>
-                            <polyline points="7 3 7 8 15 8"/>
-                        </svg>
-                        Salvos
-                    </button>
                 </div>
 
-                <!-- ESTOQUE REPORT PANEL -->
                 <div class="report-panel active" id="report-panel-estoque">
                     <div class="report-preview-header">
-                        <p class="report-desc"></p>
+                        <p class="report-desc">Gera uma lista completa do estoque atual organizada por categoria, contendo nome e quantidade de cada item.</p>
                         <button class="btn btn-primary" id="btnGerarEstoque">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                 <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
@@ -533,10 +554,9 @@
                     </div>
                 </div>
 
-                <!-- SERVIÇOS REPORT PANEL -->
                 <div class="report-panel" id="report-panel-servicos">
                     <div class="report-preview-header">
-                        <p class="report-desc"></p>
+                        <p class="report-desc">Gera uma lista dos serviços registrados contendo título, setor/cliente, data e descrição.</p>
                         <div class="report-filter-row">
                             <select id="reportServicosFilter" class="filter-select">
                                 <option value="">Todos os Status</option>
@@ -551,15 +571,6 @@
                                 </svg>
                                 Gerar PDF — Serviços
                             </button>
-                            <button class="btn btn-primary" id="btnGerarFolhaServicos">
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-                                    <polyline points="14 2 14 8 20 8"/>
-                                    <line x1="12" y1="11" x2="8" y2="11"/>
-                                    <line x1="12" y1="15" x2="8" y2="15"/>
-                                </svg>
-                                Folha em Branco
-                            </button>
                         </div>
                     </div>
                     <div class="report-preview-box" id="previewServicos">
@@ -573,13 +584,11 @@
                     </div>
                 </div>
 
-                <!-- PEDIDO REPORT PANEL -->
                 <div class="report-panel" id="report-panel-pedido">
                     <div class="report-preview-header">
-                        <p class="report-desc"></p>
+                        <p class="report-desc">Monte uma lista personalizada de itens para pedido de reposição de estoque.</p>
                     </div>
                     <div class="pedido-layout">
-                        <!-- Form to add items -->
                         <div class="pedido-form-card">
                             <h4>Adicionar Item ao Pedido</h4>
                             <div class="form-group">
@@ -601,14 +610,6 @@
                                     </select>
                                 </div>
                             </div>
-                            <div class="form-group">
-                                <label>Especificações do Produto</label>
-                                <input type="text" id="pedidoEspec" placeholder="Ex: Dell Inspiron 15, 8GB RAM, SSD 256GB">
-                            </div>
-                            <div class="form-group">
-                                <label>Descrição do Produto</label>
-                                <textarea id="pedidoDesc" rows="2" placeholder="Descreva o motivo da solicitação ou detalhes adicionais..."></textarea>
-                            </div>
                             <button class="btn btn-primary" id="btnAdicionarPedido">
                                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                     <line x1="12" y1="5" x2="12" y2="19"/>
@@ -617,8 +618,6 @@
                                 Adicionar
                             </button>
                         </div>
-
-                        <!-- List of added items -->
                         <div class="pedido-list-card">
                             <div class="pedido-list-header">
                                 <h4>Itens do Pedido <span class="badge" id="pedidoBadge">0</span></h4>
@@ -647,34 +646,13 @@
                         </div>
                     </div>
                 </div>
-
-                <!-- SALVOS PANEL -->
-                <div class="report-panel" id="report-panel-salvos">
-                    <div class="report-preview-header">
-                        <p class="report-desc"></p>
-                        <button class="btn btn-danger btn-sm" id="btnLimparSalvos">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <polyline points="3 6 5 6 21 6"/>
-                                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
-                            </svg>
-                            Limpar histórico
-                        </button>
-                    </div>
-                    <div id="savedReportsList" class="saved-reports-list">
-                        <div class="report-preview-empty">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
-                                <polyline points="17 21 17 13 7 13 7 21"/>
-                            </svg>
-                            <p>Nenhum relatório salvo ainda. Gere um relatório de estoque ou serviços para ele aparecer aqui.</p>
-                        </div>
-                    </div>
-                </div>
-
             </section>
         </main>
     </div>
 
+    <!-- ==================== MODAIS ==================== -->
+
+    <!-- Modal Item -->
     <div class="modal-overlay" id="itemModal">
         <div class="modal">
             <div class="modal-header">
@@ -725,6 +703,7 @@
         </div>
     </div>
 
+    <!-- Modal Snippet -->
     <div class="modal-overlay" id="snippetModal">
         <div class="modal modal-large">
             <div class="modal-header">
@@ -780,6 +759,7 @@
         </div>
     </div>
 
+    <!-- Modal View Snippet -->
     <div class="modal-overlay" id="viewSnippetModal">
         <div class="modal modal-large">
             <div class="modal-header">
@@ -805,6 +785,7 @@
         </div>
     </div>
 
+    <!-- Modal Serviço -->
     <div class="modal-overlay" id="serviceModal">
         <div class="modal modal-large">
             <div class="modal-header">
@@ -852,6 +833,7 @@
         </div>
     </div>
 
+    <!-- Modal View Serviço -->
     <div class="modal-overlay" id="viewServiceModal">
         <div class="modal modal-large">
             <div class="modal-header">
@@ -860,7 +842,6 @@
             </div>
             <div class="modal-body">
                 <div class="service-view-meta" id="viewServiceMeta"></div>
-                <div class="service-authorship" id="viewServiceAuthorship" style="display:none;"></div>
                 <div class="service-view-section">
                     <h4>Descrição</h4>
                     <p id="viewServiceDescription"></p>
@@ -877,6 +858,58 @@
         </div>
     </div>
 
+    <!-- Modal Solicitação -->
+    <div class="modal-overlay" id="solicitacaoModal">
+        <div class="modal modal-large">
+            <div class="modal-header">
+                <h3 id="solModalTitle">Solicitação</h3>
+                <button class="modal-close" data-close="solicitacaoModal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="sol-modal-meta" id="solModalMeta"></div>
+                <div class="service-view-section">
+                    <h4>Descrição do Problema</h4>
+                    <p id="solModalDescricao"></p>
+                </div>
+                <div id="solModalAcoes">
+                    <div class="sol-priority-select">
+                        <label class="sol-priority-label">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+                                <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+                            </svg>
+                            Definir Prioridade antes de salvar
+                        </label>
+                        <select id="solPrioridade" class="filter-select" style="min-width:160px">
+                            <option value="baixa">Baixa</option>
+                            <option value="media" selected>Média</option>
+                            <option value="alta">Alta</option>
+                            <option value="urgente">Urgente</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer" id="solModalFooter">
+                    <button type="button" class="btn btn-secondary" data-close="solicitacaoModal">Fechar</button>
+                    <button type="button" class="btn btn-danger" id="solExcluirBtn">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="3 6 5 6 21 6"/>
+                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/>
+                        </svg>
+                        Excluir
+                    </button>
+                    <button type="button" class="btn btn-primary" id="solSalvarBtn">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
+                            <polyline points="17 21 17 13 7 13 7 21"/>
+                            <polyline points="7 3 7 8 15 8"/>
+                        </svg>
+                        Salvar como Serviço
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Confirmação -->
     <div class="modal-overlay" id="confirmModal">
         <div class="modal modal-small">
             <div class="modal-header">
@@ -895,6 +928,6 @@
 
     <div class="toast-container" id="toastContainer"></div>
 
-    <script src="app.js?v=3"></script>
+    <script src="app.js?v=4"></script>
 </body>
 </html>

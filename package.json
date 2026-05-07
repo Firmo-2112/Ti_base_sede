@@ -1,5 +1,5 @@
 {
-  "name": "setor-ti", 
+  "name": "setor-ti",
   "version": "1.0.0",
   "description": "Gerenciador para Técnico de TI com MySQL",
   "main": "server.js",
