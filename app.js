@@ -774,6 +774,23 @@ const Services = {
         document.getElementById('viewServiceMeta').innerHTML = '<span class="service-status-badge ' + service.status + '">' + statusLabel + '</span><span class="service-priority ' + service.prioridade + '">' + (priorityLabels[service.prioridade] || service.prioridade) + '</span>' + (service.cliente_setor ? '<span>' + Inventory.escapeHtml(service.cliente_setor) + '</span>' : '') + (service.data_servico ? '<span>' + new Date(service.data_servico).toLocaleDateString('pt-BR') + '</span>' : '');
         document.getElementById('viewServiceDescription').textContent = service.descricao;
         document.getElementById('viewServiceReport').textContent = service.relatorio || 'Nenhum relatório registrado.';
+        const authEl = document.getElementById('viewServiceAuthorship');
+        if (authEl) {
+            let authHtml = '';
+            if (service.criado_por) authHtml += '<span class="service-emitido-por">Emitido por: ' + Inventory.escapeHtml(service.criado_por) + '</span>';
+            if (service.modificado_por) authHtml += '<span class="service-modificado-por">Modificado por: ' + Inventory.escapeHtml(service.modificado_por) + '</span>';
+            authEl.innerHTML = authHtml;
+            authEl.style.display = authHtml ? 'flex' : 'none';
+        }
+        // Mostrar/ocultar botão Editar conforme ownership (loose equality)
+        const curIdView = AppState.currentUser && AppState.currentUser.id;
+        const isOwnerView = !service.usuario_id || String(service.usuario_id) === String(curIdView);
+        const editFromViewBtn = document.getElementById('editFromViewBtn');
+        if (editFromViewBtn) {
+            editFromViewBtn.style.display = isOwnerView ? 'inline-flex' : 'none';
+            const svcId = service.id;
+            editFromViewBtn.onclick = () => { Modal.close('viewServiceModal'); Services.openEditModal(svcId); };
+        }
         Modal.open('viewServiceModal');
     },
 
@@ -806,7 +823,8 @@ const Services = {
             await Dashboard.update();
             await ActivityLogger.renderServices();
         } catch (e) {
-            Toast.show('Erro ao salvar serviço!', 'error');
+            const msg = (e && e.error) ? e.error : 'Erro ao salvar serviço!';
+            Toast.show(msg, 'error');
         }
     },
 
@@ -818,23 +836,9 @@ const Services = {
             await Dashboard.update();
             await ActivityLogger.renderServices();
         } catch (e) {
-            Toast.show('Erro ao concluir serviço!', 'error');
+            const msg = (e && e.error) ? e.error : 'Erro ao concluir serviço!';
+            Toast.show(msg, 'error');
         }
-    },
-
-    deleteService(id) {
-        const service = AppState.services.find(s => String(s.id) === String(id));
-        if (!service) return;
-        Modal.confirm('Excluir Serviço', 'Tem certeza que deseja excluir "' + service.titulo + '"?', async () => {
-            try {
-                await API.delete('/api/servicos/' + id);
-                Toast.show('Serviço excluído com sucesso!', 'success');
-                await this.render();
-                await Dashboard.update();
-            } catch (e) {
-                Toast.show('Erro ao excluir serviço!', 'error');
-            }
-        });
     },
 
     getStatusLabel(status) { return status === 'pending' ? 'Pendente' : 'Concluído'; },
@@ -842,6 +846,96 @@ const Services = {
     getPriorityLabel(priority) {
         const labels = { baixa: 'Baixa', media: 'Média', alta: 'Alta', urgente: 'Urgente' };
         return labels[priority] || priority;
+    },
+
+    // ==========================================
+    // GERADOR DE PDF INDIVIDUAL POR SERVIÇO
+    // ==========================================
+    async gerarPdfServico(id) {
+        const service = AppState.services.find(s => String(s.id) === String(id));
+        if (!service) { Toast.show('Serviço não encontrado!', 'error'); return; }
+        try {
+            const brasao = await Reports.loadBrasao();
+            const today = new Date().toLocaleDateString('pt-BR');
+            const protocolo = Reports.generateProtocol();
+            const emitidoPor = AppState.currentUser ? AppState.currentUser.nome || AppState.currentUser.usuario : '';
+            const dataSolic = service.data_servico   ? new Date(service.data_servico).toLocaleDateString('pt-BR')   : '-';
+            const dataConc  = service.data_conclusao ? new Date(service.data_conclusao).toLocaleDateString('pt-BR') : '-';
+            const statusLabel = service.status === 'pending' ? 'Pendente' : 'Concluído';
+            const statusColor = service.status === 'pending' ? '#d97706' : '#059669';
+            const priorityLabels = { baixa: 'Baixa', media: 'Média', alta: 'Alta', urgente: 'Urgente' };
+            const priorityColors = { baixa: '#059669', media: '#0ea5e9', alta: '#d97706', urgente: '#dc2626' };
+            const prioridade = service.prioridade || 'media';
+            const headerHtml = await Reports._buildPdfHeader(brasao);
+
+            const html = `<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <style>
+        body { font-family: Arial, sans-serif; margin: 40px; color: #222; }
+        table { width: 100%; border-collapse: collapse; }
+        th { background: #1a2744; color: #fff; padding: 10px 12px; font-size: 13px; text-align: left; }
+        td { padding: 9px 12px; border-bottom: 1px solid #e5e7eb; font-size: 13px; vertical-align: top; }
+        .sec-title { background: #1a2744; color: #fff; font-weight: 700; font-size: 12px;
+                     padding: 7px 12px; letter-spacing: 0.5px; margin-top: 18px; }
+        .text-block { background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 4px;
+                      padding: 12px 14px; font-size: 13px; line-height: 1.75; white-space: pre-wrap;
+                      word-break: break-word; color: #333; margin: 0; }
+    </style>
+</head>
+<body>
+    ${headerHtml}
+
+    <div style="display:flex;justify-content:space-between;margin-bottom:18px;align-items:flex-end;">
+        <h2 style="margin:0;font-size:16px;color:#1a2744;">Ordem de Serviço</h2>
+        <div style="text-align:right;">
+            <span style="font-size:13px;font-weight:700;color:#1a2744;display:block;letter-spacing:0.5px;">Protocolo Nº ${protocolo}</span>
+            <span style="font-size:11px;color:#777;display:block;">Emitido em: ${today}</span>
+            ${emitidoPor ? `<span style="font-size:11px;color:#777;display:block;">Emitido por: ${emitidoPor}</span>` : ''}
+        </div>
+    </div>
+
+    <!-- Tabela de metadados -->
+    <table>
+        <thead>
+            <tr>
+                <th>Título do Serviço</th>
+                <th style="width:130px;">Setor / Cliente</th>
+                <th style="width:110px;">Data de Solicitação</th>
+                <th style="width:110px;">Data de Conclusão</th>
+                <th style="width:90px;">Status</th>
+                <th style="width:90px;">Prioridade</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr style="background:#f9fafb;">
+                <td style="font-weight:700;font-size:14px;">${Inventory.escapeHtml(service.titulo)}</td>
+                <td>${Inventory.escapeHtml(service.cliente_setor || '-')}</td>
+                <td style="white-space:nowrap;">${dataSolic}</td>
+                <td style="white-space:nowrap;">${dataConc}</td>
+                <td><span style="color:${statusColor};font-weight:700;">${statusLabel}</span></td>
+                <td><span style="color:${priorityColors[prioridade]};font-weight:700;">${priorityLabels[prioridade] || prioridade}</span></td>
+            </tr>
+        </tbody>
+    </table>
+
+    <!-- Descrição -->
+    <div class="sec-title">Descrição do Serviço</div>
+    <div class="text-block">${Inventory.escapeHtml(service.descricao || 'Nenhuma descrição registrada.')}</div>
+
+    <!-- Relatório -->
+    <div class="sec-title">Relatório de Atividades Realizadas</div>
+    <div class="text-block">${Inventory.escapeHtml(service.relatorio || 'Nenhum relatório registrado.')}</div>
+
+    ${Reports._buildPdfFooter()}
+</body>
+</html>`;
+
+            Reports._printHtml(html, 'Servico_' + (service.titulo || 'sem_titulo').replace(/\s+/g, '_').substring(0, 40));
+        } catch (e) {
+            Toast.show('Erro ao gerar PDF do serviço!', 'error');
+        }
     },
 
     async render(searchTerm = '', statusFilter = '') {
@@ -874,13 +968,27 @@ const Services = {
                 const statusLabel = this.getStatusLabel(service.status);
                 const priorityLabel = this.getPriorityLabel(service.prioridade);
                 const date = service.data_servico ? new Date(service.data_servico).toLocaleDateString('pt-BR') : '-';
+                // Dono = sem usuario_id registrado (legado) OU mesmo id
+                const curId = AppState.currentUser && AppState.currentUser.id;
+                // Use == (loose equality) — usuario_id may come as string or number
+                const isOwnerForActions = !service.usuario_id || String(service.usuario_id) === String(curId);
                 let actionsHtml = '<div class="service-card-actions" onclick="event.stopPropagation()">';
-                actionsHtml += '<button class="btn btn-sm btn-secondary" onclick="Services.openEditModal(\'' + service.id + '\')">Editar</button>';
-                if (service.status === 'pending') {
-                    actionsHtml += '<button class="btn btn-sm btn-primary" onclick="Services.completeService(\'' + service.id + '\')">Concluir</button>';
+                if (isOwnerForActions) {
+                    actionsHtml += '<button class="btn btn-sm btn-secondary" onclick="Services.openEditModal(\'' + service.id + '\')">Editar</button>';
+                    if (service.status === 'pending') {
+                        actionsHtml += '<button class="btn btn-sm btn-primary" onclick="Services.completeService(\'' + service.id + '\')">Concluir</button>';
+                    }
                 }
-                actionsHtml += '<button class="btn btn-sm btn-danger" onclick="Services.deleteService(\'' + service.id + '\')">Excluir</button></div>';
-                return '<div class="service-card" onclick="Services.viewService(\'' + service.id + '\')"><div class="service-card-header"><h4 class="service-title">' + Inventory.escapeHtml(service.titulo) + '</h4><span class="service-status-badge ' + service.status + '">' + statusLabel + '</span></div><div class="service-meta">' + (service.cliente_setor ? '<span>' + Inventory.escapeHtml(service.cliente_setor) + '</span>' : '') + '<span class="service-priority ' + service.prioridade + '">' + priorityLabel + '</span><span>' + date + '</span></div><p class="service-description">' + Inventory.escapeHtml(service.descricao) + '</p>' + actionsHtml + '</div>';
+                actionsHtml += '<button class="btn btn-sm btn-pdf" onclick="Services.gerarPdfServico(\'' + service.id + '\')" title="Gerar PDF deste serviço">'
+                    + '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px;margin-right:3px;">'
+                    + '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>'
+                    + '<polyline points="7 10 12 15 17 10"/>'
+                    + '<line x1="12" y1="15" x2="12" y2="3"/>'
+                    + '</svg>PDF</button>';
+                actionsHtml += '</div>';
+                const emitidoPor = service.criado_por ? '<span class="service-emitido-por">Emitido por: ' + Inventory.escapeHtml(service.criado_por) + '</span>' : '';
+                const modificadoPor = service.modificado_por ? '<span class="service-modificado-por">Modificado por: ' + Inventory.escapeHtml(service.modificado_por) + '</span>' : '';
+                return '<div class="service-card" onclick="Services.viewService(\'' + service.id + '\')"><div class="service-card-header"><h4 class="service-title">' + Inventory.escapeHtml(service.titulo) + '</h4><span class="service-status-badge ' + service.status + '">' + statusLabel + '</span></div><div class="service-meta">' + (service.cliente_setor ? '<span>' + Inventory.escapeHtml(service.cliente_setor) + '</span>' : '') + '<span class="service-priority ' + service.prioridade + '">' + priorityLabel + '</span><span>' + date + '</span></div><p class="service-description">' + Inventory.escapeHtml(service.descricao) + '</p>' + (emitidoPor || modificadoPor ? '<div class="service-authorship">' + emitidoPor + modificadoPor + '</div>' : '') + actionsHtml + '</div>';
             }).join('');
         }
     }
@@ -905,7 +1013,6 @@ const Solicitacoes = {
             this.render(document.getElementById('solicitacoesSearch').value, e.target.value);
         });
         document.getElementById('solSalvarBtn').addEventListener('click', () => this.salvarComoServico());
-        document.getElementById('solExcluirBtn').addEventListener('click', () => this.excluirSolicitacao());
     },
 
     async render(searchTerm = '', statusFilter = '') {
@@ -973,7 +1080,6 @@ const Solicitacoes = {
                 + '</div>'
                 + '<div class="sol-card-actions" onclick="event.stopPropagation()">'
                 + (isNova ? '<button class="btn btn-sm btn-primary" onclick="Solicitacoes.openModal(\'' + sol.id + '\')">Analisar</button>' : '')
-                + '<button class="btn btn-sm btn-danger btn-icon" onclick="Solicitacoes.confirmarExcluir(\'' + sol.id + '\', \'' + Inventory.escapeHtml(sol.numero_so) + '\')" title="Excluir"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>'
                 + '</div>'
                 + '</div>';
         }).join('');
@@ -1045,39 +1151,12 @@ const Solicitacoes = {
         }
     },
 
-    excluirSolicitacao() {
-        if (!this.currentId) return;
-        Modal.close('solicitacaoModal');
-        Modal.confirm('Excluir Solicitação', 'Tem certeza que deseja excluir esta solicitação?', async () => {
-            try {
-                await API.delete('/api/solicitacoes/' + this.currentId);
-                Toast.show('Solicitação excluída!', 'success');
-                await this.render();
-                await Dashboard.update();
-            } catch (e) {
-                Toast.show('Erro ao excluir!', 'error');
-            }
-        });
-    },
-
-    confirmarExcluir(id, numeroSo) {
-        Modal.confirm('Excluir Solicitação', 'Excluir a solicitação ' + numeroSo + '?', async () => {
-            try {
-                await API.delete('/api/solicitacoes/' + id);
-                Toast.show('Solicitação excluída!', 'success');
-                await this.render();
-                await Dashboard.update();
-            } catch (e) {
-                Toast.show('Erro ao excluir!', 'error');
-            }
-        });
-    },
-
     getPrioLabel(p) {
         const l = { baixa: 'Baixa', media: 'Média', alta: 'Alta', urgente: 'Urgente' };
         return l[p] || p;
     }
 };
+
 
 // ==========================================
 // RELATÓRIOS

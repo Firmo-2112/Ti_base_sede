@@ -647,6 +647,208 @@
                     </div>
                 </div>
             </section>
+            <!-- ==================== RELATÓRIOS TAB ==================== -->
+            <section class="tab-content" id="reports-tab">
+                <div class="content-header">
+                    <h2>Relatórios</h2>
+                    <p class="subtitle">Gere e exporte relatórios em PDF</p>
+                </div>
+
+                <!-- Sub-tabs -->
+                <div class="reports-subtabs">
+                    <button class="report-subtab active" data-report="estoque">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
+                        </svg>
+                        Estoque
+                    </button>
+                    <button class="report-subtab" data-report="servicos">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                            <polyline points="14 2 14 8 20 8"/>
+                        </svg>
+                        Serviços
+                    </button>
+                    <button class="report-subtab" data-report="pedido">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <line x1="12" y1="5" x2="12" y2="19"/>
+                            <line x1="5" y1="12" x2="19" y2="12"/>
+                        </svg>
+                        Criar Relatório
+                    </button>
+                    <button class="report-subtab" data-report="salvos">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
+                            <polyline points="17 21 17 13 7 13 7 21"/>
+                            <polyline points="7 3 7 8 15 8"/>
+                        </svg>
+                        Salvos
+                    </button>
+                </div>
+
+                <!-- ESTOQUE REPORT PANEL -->
+                <div class="report-panel active" id="report-panel-estoque">
+                    <div class="report-preview-header">
+                        <p class="report-desc">Gera uma lista completa do estoque atual organizada por categoria, contendo nome e quantidade de cada item.</p>
+                        <button class="btn btn-primary" id="btnGerarEstoque">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                                <polyline points="7 10 12 15 17 10"/>
+                                <line x1="12" y1="15" x2="12" y2="3"/>
+                            </svg>
+                            Gerar PDF — Estoque
+                        </button>
+                    </div>
+                    <div class="report-preview-box" id="previewEstoque">
+                        <div class="report-preview-empty">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M9 17H5a2 2 0 0 0-2 2v0a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v0a2 2 0 0 0-2-2h-4"/>
+                                <rect x="9" y="3" width="6" height="14" rx="1"/>
+                            </svg>
+                            <p>Clique em "Gerar PDF" para criar o relatório de estoque</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- SERVIÇOS REPORT PANEL -->
+                <div class="report-panel" id="report-panel-servicos">
+                    <div class="report-preview-header">
+                        <p class="report-desc">Gera uma lista dos serviços registrados contendo título, setor/cliente, data e descrição.</p>
+                        <div class="report-filter-row">
+                            <select id="reportServicosFilter" class="filter-select">
+                                <option value="">Todos os Status</option>
+                                <option value="pending">Pendentes</option>
+                                <option value="completed">Concluídos</option>
+                            </select>
+                            <button class="btn btn-primary" id="btnGerarServicos">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                                    <polyline points="7 10 12 15 17 10"/>
+                                    <line x1="12" y1="15" x2="12" y2="3"/>
+                                </svg>
+                                Gerar PDF — Serviços
+                            </button>
+                            <button class="btn btn-primary" id="btnGerarFolhaServicos">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                                    <polyline points="14 2 14 8 20 8"/>
+                                    <line x1="12" y1="11" x2="8" y2="11"/>
+                                    <line x1="12" y1="15" x2="8" y2="15"/>
+                                </svg>
+                                Folha em Branco
+                            </button>
+                        </div>
+                    </div>
+                    <div class="report-preview-box" id="previewServicos">
+                        <div class="report-preview-empty">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                                <polyline points="14 2 14 8 20 8"/>
+                            </svg>
+                            <p>Clique em "Gerar PDF" para criar o relatório de serviços</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- PEDIDO REPORT PANEL -->
+                <div class="report-panel" id="report-panel-pedido">
+                    <div class="report-preview-header">
+                        <p class="report-desc">Monte uma lista personalizada de itens para pedido de reposição de estoque.</p>
+                    </div>
+                    <div class="pedido-layout">
+                        <!-- Form to add items -->
+                        <div class="pedido-form-card">
+                            <h4>Adicionar Item ao Pedido</h4>
+                            <div class="form-group">
+                                <label>Nome do Produto</label>
+                                <input type="text" id="pedidoNome" placeholder="Ex: Mouse USB Logitech">
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label>Quantidade</label>
+                                    <input type="number" id="pedidoQtd" min="1" value="1" placeholder="Qtd">
+                                </div>
+                                <div class="form-group">
+                                    <label>Nível de Necessidade</label>
+                                    <select id="pedidoNivel">
+                                        <option value="Baixa">Baixa</option>
+                                        <option value="Média" selected>Média</option>
+                                        <option value="Alta">Alta</option>
+                                        <option value="Urgente">Urgente</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label>Especificações do Produto</label>
+                                <input type="text" id="pedidoEspec" placeholder="Ex: Dell Inspiron 15, 8GB RAM, SSD 256GB">
+                            </div>
+                            <div class="form-group">
+                                <label>Descrição do Produto</label>
+                                <textarea id="pedidoDesc" rows="2" placeholder="Descreva o motivo da solicitação ou detalhes adicionais..."></textarea>
+                            </div>
+                            <button class="btn btn-primary" id="btnAdicionarPedido">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <line x1="12" y1="5" x2="12" y2="19"/>
+                                    <line x1="5" y1="12" x2="19" y2="12"/>
+                                </svg>
+                                Adicionar
+                            </button>
+                        </div>
+
+                        <!-- List of added items -->
+                        <div class="pedido-list-card">
+                            <div class="pedido-list-header">
+                                <h4>Itens do Pedido <span class="badge" id="pedidoBadge">0</span></h4>
+                                <button class="btn btn-primary" id="btnGerarPedido" disabled>
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                                        <polyline points="7 10 12 15 17 10"/>
+                                        <line x1="12" y1="15" x2="12" y2="3"/>
+                                    </svg>
+                                    Gerar PDF
+                                </button>
+                            </div>
+                            <div class="pedido-items-list" id="pedidoItemsList">
+                                <div class="report-preview-empty">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <line x1="8" y1="6" x2="21" y2="6"/>
+                                        <line x1="8" y1="12" x2="21" y2="12"/>
+                                        <line x1="8" y1="18" x2="21" y2="18"/>
+                                        <line x1="3" y1="6" x2="3.01" y2="6"/>
+                                        <line x1="3" y1="12" x2="3.01" y2="12"/>
+                                        <line x1="3" y1="18" x2="3.01" y2="18"/>
+                                    </svg>
+                                    <p>Nenhum item adicionado ainda</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- SALVOS PANEL -->
+                <div class="report-panel" id="report-panel-salvos">
+                    <div class="report-preview-header">
+                        <p class="report-desc">Relatórios de estoque e serviços gerados anteriormente ficam salvos aqui.</p>
+                        <button class="btn btn-danger btn-sm" id="btnLimparSalvos">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="3 6 5 6 21 6"/>
+                                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                            </svg>
+                            Limpar histórico
+                        </button>
+                    </div>
+                    <div id="savedReportsList" class="saved-reports-list">
+                        <div class="report-preview-empty">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
+                                <polyline points="17 21 17 13 7 13 7 21"/>
+                            </svg>
+                            <p>Nenhum relatório salvo ainda. Gere um relatório de estoque ou serviços para ele aparecer aqui.</p>
+                        </div>
+                    </div>
+                </div>
+
+            </section>
         </main>
     </div>
 
