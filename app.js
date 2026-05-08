@@ -1,6 +1,6 @@
 // FUNDO BINÁRIO
 const canvas = document.getElementById('matrix');
-const ctx = canvas.getContext('2d');
+const ctx = canvas.getContext('2d'); 
 
 canvas.height = window.innerHeight;
 canvas.width = window.innerWidth;
@@ -13,18 +13,26 @@ const drops = [];
 for(let x=0;x<columns;x++) drops[x]=1;
 
 function draw(){
-    ctx.fillStyle = 'rgba(0,0,0,0.05)';
-    ctx.fillRect(0,0,canvas.width,canvas.height);
-    ctx.fillStyle = '#00d4ff';
-    ctx.font = fontSize+'px monospace';
-    for(let i=0;i<drops.length;i++){
-        const text = letters[Math.floor(Math.random()*letters.length)];
-        ctx.fillText(text,i*fontSize,drops[i]*fontSize);
-        if(drops[i]*fontSize>canvas.height && Math.random()>0.975) drops[i]=0;
-        drops[i]++;
-    }
+ctx.fillStyle = 'rgba(0,0,0,0.05)';
+ctx.fillRect(0,0,canvas.width,canvas.height);
+
+ctx.fillStyle = '#00d4ff';
+ctx.font = fontSize+'px monospace';
+
+for(let i=0;i<drops.length;i++){
+const text = letters[Math.floor(Math.random()*letters.length)];
+ctx.fillText(text,i*fontSize,drops[i]*fontSize);
+
+if(drops[i]*fontSize>canvas.height && Math.random()>0.975)
+drops[i]=0;
+
+ drops[i]++;
 }
+}
+
 setInterval(draw,33);
+
+
 
 // ==========================================
 // SETOR DE TI - FRONTEND (API VERSION)
@@ -39,20 +47,32 @@ const AppState = {
     inventoryActivities: [],
     servicesActivities: [],
     settings: { theme: 'dark' },
-    authToken: null
+    authToken: null,
+    currentUser: null   // { id, usuario, nome }
 };
 
 // ==========================================
 // CLIENTE DE API
 // ==========================================
 const API = {
-    BASE: '',
+    BASE: '', // Mesmo domínio — Railway serve tudo junto
 
     headers() {
-        return {
+        const h = {
             'Content-Type': 'application/json',
             'x-auth-token': AppState.authToken || ''
         };
+        if (AppState.currentUser) {
+            h['x-user-id']   = String(AppState.currentUser.id || '');
+            h['x-user-nome'] = encodeURIComponent(AppState.currentUser.nome || AppState.currentUser.usuario || '');
+        }
+        // Debug: log user being sent (remove after confirming works)
+        if (AppState.currentUser) {
+            console.debug('[API] user header:', AppState.currentUser.nome || AppState.currentUser.usuario, '| id:', AppState.currentUser.id);
+        } else {
+            console.warn('[API] NO currentUser — headers will not include user info');
+        }
+        return h;
     },
 
     async get(path) {
@@ -137,6 +157,10 @@ const LoginManager = {
         const token = sessionStorage.getItem('setorTI_token');
         if (token) {
             AppState.authToken = token;
+            const savedUser = sessionStorage.getItem('setorTI_user');
+            if (savedUser) {
+                try { AppState.currentUser = JSON.parse(savedUser); } catch(e) {}
+            }
             this.showApp();
         }
     },
@@ -152,7 +176,9 @@ const LoginManager = {
         try {
             const data = await API.post('/api/login', { usuario: user, senha: password });
             AppState.authToken = data.token;
+            AppState.currentUser = data.user;
             sessionStorage.setItem('setorTI_token', data.token);
+            sessionStorage.setItem('setorTI_user', JSON.stringify(data.user));
             this.showApp();
             Toast.show('Login realizado com sucesso!', 'success');
         } catch (err) {
@@ -166,7 +192,9 @@ const LoginManager = {
 
     logout() {
         sessionStorage.removeItem('setorTI_token');
+        sessionStorage.removeItem('setorTI_user');
         AppState.authToken = null;
+        AppState.currentUser = null;
         if (this.inactivityTimer) clearTimeout(this.inactivityTimer);
 
         document.getElementById('appContainer').style.display = 'none';
@@ -213,14 +241,31 @@ const LoginManager = {
         document.getElementById('loginScreen').style.display = 'none';
         document.getElementById('appContainer').style.display = 'flex';
         this.resetInactivityTimer();
+        this.renderUserAvatar();
         ['mousedown', 'mousemove', 'keydown', 'scroll', 'touchstart', 'click'].forEach(event => {
             document.addEventListener(event, () => this.resetInactivityTimer(), { passive: true });
         });
         this.initializeApp();
     },
 
+    renderUserAvatar() {
+        const user = AppState.currentUser;
+        if (!user) return;
+        const initial = (user.nome || user.usuario || '?').charAt(0).toUpperCase();
+        const avatarEl = document.getElementById('userAvatar');
+        if (avatarEl) {
+            avatarEl.textContent = initial;
+            avatarEl.title = user.nome || user.usuario;
+        }
+        const userNameEl = document.getElementById('userAvatarName');
+        if (userNameEl) {
+            userNameEl.textContent = user.nome || user.usuario;
+        }
+    },
+
     async initializeApp() {
         try {
+            // Carregar configurações do banco
             const config = await API.get('/api/configuracoes');
             if (config.tema) {
                 AppState.settings.theme = config.tema;
@@ -330,9 +375,14 @@ const ActivityLogger = {
             container.innerHTML = activities.map(a => {
                 const time = this.formatTime(a.data_atividade);
                 const icon = icons[a.acao] || icons.add;
-                return '<div class="activity-item"><div class="activity-icon ' + a.acao + '">' + icon + '</div><div class="activity-content"><span class="activity-text">' + a.detalhes + '</span><span class="activity-time">' + time + '</span></div></div>';
+                const acaoLabels = { add:'Adicionou', edit:'Editou', delete:'Excluiu', complete:'Concluiu' };
+                const acaoLabel = acaoLabels[a.acao] || a.acao;
+                const userLine = a.usuario_nome
+                    ? '<span class="activity-user-line"><span class="activity-action-verb ' + a.acao + '">' + acaoLabel + '</span> <strong>' + a.usuario_nome + '</strong></span>'
+                    : '';
+                return '<div class="activity-item"><div class="activity-icon ' + a.acao + '">' + icon + '</div><div class="activity-content"><span class="activity-text">' + a.detalhes + '</span>' + userLine + '<span class="activity-time">' + time + '</span></div></div>';
             }).join('');
-        } catch (e) { container.innerHTML = '<p style="color: var(--text-muted)">Erro ao carregar atividades</p>'; }
+        } catch (e) { console.error('ActivityLogger.renderInventory error:', e); container.innerHTML = '<p style="color: var(--text-muted)">Erro ao carregar atividades</p>'; }
     },
 
     async renderServices() {
@@ -353,9 +403,32 @@ const ActivityLogger = {
             container.innerHTML = activities.map(a => {
                 const time = this.formatTime(a.data_atividade);
                 const icon = icons[a.acao] || icons.add;
-                return '<div class="activity-item"><div class="activity-icon ' + a.acao + '">' + icon + '</div><div class="activity-content"><span class="activity-text">' + a.detalhes + '</span><span class="activity-time">' + time + '</span></div></div>';
+                const userTag = a.usuario_nome ? '<span class="activity-user">por ' + a.usuario_nome + '</span>' : '';
+                let snapshotBtn = '';
+                if (a.acao === 'delete' && a.snapshot && typeof a.snapshot === 'object') {
+                    const snap = a.snapshot;
+                    const snapId = 'snap-' + a.id;
+                    const priorityLabels = { baixa:'Baixa', media:'Média', alta:'Alta', urgente:'Urgente' };
+                    const statusLabel = snap.status === 'pending' ? 'Pendente' : 'Concluído';
+                    snapshotBtn = '<button class="activity-snapshot-btn" onclick="document.getElementById(\'' + snapId + '\').classList.toggle(\' visible\')">Ver dados</button>'
+                        + '<div class="activity-snapshot" id="' + snapId + '">'
+                        + '<div class="snap-row"><span class="snap-lbl">Título</span><span>' + (snap.titulo||'-') + '</span></div>'
+                        + '<div class="snap-row"><span class="snap-lbl">Setor/Cliente</span><span>' + (snap.cliente_setor||'-') + '</span></div>'
+                        + '<div class="snap-row"><span class="snap-lbl">Prioridade</span><span>' + (priorityLabels[snap.prioridade]||snap.prioridade||'-') + '</span></div>'
+                        + '<div class="snap-row"><span class="snap-lbl">Status</span><span>' + statusLabel + '</span></div>'
+                        + '<div class="snap-row"><span class="snap-lbl">Emitido por</span><span>' + (snap.criado_por||'-') + '</span></div>'
+                        + '<div class="snap-row full"><span class="snap-lbl">Descrição</span><span>' + (snap.descricao||'-') + '</span></div>'
+                        + '<div class="snap-row full"><span class="snap-lbl">Relatório</span><span>' + (snap.relatorio||'-') + '</span></div>'
+                        + '</div>';
+                }
+                const acaoLabelsSvc = { add:'Adicionou', edit:'Editou', delete:'Excluiu', complete:'Concluiu' };
+                const acaoLabelSvc = acaoLabelsSvc[a.acao] || a.acao;
+                const userLineSvc = a.usuario_nome
+                    ? '<span class="activity-user-line"><span class="activity-action-verb ' + a.acao + '">' + acaoLabelSvc + '</span> <strong>' + a.usuario_nome + '</strong></span>'
+                    : '';
+                return '<div class="activity-item"><div class="activity-icon ' + a.acao + '">' + icon + '</div><div class="activity-content"><span class="activity-text">' + a.detalhes + '</span>' + userLineSvc + '<span class="activity-time">' + time + '</span>' + snapshotBtn + '</div></div>';
             }).join('');
-        } catch (e) { container.innerHTML = '<p style="color: var(--text-muted)">Erro ao carregar atividades</p>'; }
+        } catch (e) { console.error('ActivityLogger.renderServices error:', e); container.innerHTML = '<p style="color: var(--text-muted)">Erro ao carregar atividades</p>'; }
     },
 
     formatTime(timestamp) {
@@ -381,13 +454,13 @@ const Dashboard = {
             document.getElementById('totalSnippets').textContent = s.total_snippets || 0;
             const pending = s.servicos_pendentes || 0;
             const lowStock = s.itens_estoque_baixo || 0;
-            const solNovas = s.solicitacoes_novas || 0;
             document.getElementById('pendingServices').textContent = pending;
             document.getElementById('lowStockItems').textContent = lowStock;
             document.getElementById('inventoryBadge').textContent = lowStock;
             document.getElementById('inventoryBadge').style.display = lowStock > 0 ? 'inline' : 'none';
             document.getElementById('servicesBadge').textContent = pending;
             document.getElementById('servicesBadge').style.display = pending > 0 ? 'inline' : 'none';
+            const solNovas = s.solicitacoes_novas || 0;
             const solBadge = document.getElementById('solicitacoesBadge');
             if (solBadge) {
                 solBadge.textContent = solNovas;
@@ -716,7 +789,7 @@ const Snippets = {
             const categoryLabels = { sistema: 'Sistema', impressora: 'Impressora', rede: 'Rede' };
             grid.innerHTML = snippets.map(snippet => {
                 const tags = snippet.tags ? snippet.tags.split(',').map(t => '<span class="snippet-tag">' + t.trim() + '</span>').join('') : '';
-                return '<div class="snippet-card" onclick="Snippets.viewSnippet(\'' + snippet.id + '\')"><div class="snippet-card-header"><h4 class="snippet-title">' + Inventory.escapeHtml(snippet.titulo) + '</h4><span class="snippet-type-badge ' + snippet.tipo + '">' + snippet.tipo.toUpperCase() + '</span></div><p class="snippet-description">' + Inventory.escapeHtml(snippet.descricao || '') + '</p><div class="snippet-tags"><span class="snippet-tag">' + (categoryLabels[snippet.categoria] || snippet.categoria) + '</span>' + tags + '</div><pre class="snippet-preview">' + Inventory.escapeHtml((snippet.codigo || '').substring(0, 100)) + '</pre><div class="snippet-actions" onclick="event.stopPropagation()"><button class="btn btn-sm btn-secondary btn-icon" onclick="Snippets.openEditModal(\'' + snippet.id + '\')" title="Editar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button><button class="btn btn-sm btn-danger btn-icon" onclick="Snippets.deleteSnippet(\'' + snippet.id + '\')" title="Excluir"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button></div></div>';
+                return '<div class="snippet-card" onclick="Snippets.viewSnippet(\'' + snippet.id + '\')"><div class="snippet-card-header"><h4 class="snippet-title">' + Inventory.escapeHtml(snippet.titulo) + '</h4><span class="snippet-type-badge ' + snippet.tipo + '">' + snippet.tipo.toUpperCase() + '</span></div><p class="snippet-description">' + Inventory.escapeHtml(snippet.descricao || '') + '</p><div class="snippet-tags"><span class="snippet-tag">' + (categoryLabels[snippet.categoria] || snippet.categoria) + '</span>' + tags + '</div><pre class="snippet-preview">' + Inventory.escapeHtml((snippet.codigo || '').substring(0, 100)) + '</pre></div>';
             }).join('');
         }
     }
@@ -841,6 +914,21 @@ const Services = {
         }
     },
 
+    deleteService(id) {
+        const service = AppState.services.find(s => String(s.id) === String(id));
+        if (!service) return;
+        Modal.confirm('Excluir Serviço', 'Tem certeza que deseja excluir "' + service.titulo + '"?', async () => {
+            try {
+                await API.delete('/api/servicos/' + id);
+                Toast.show('Serviço excluído com sucesso!', 'success');
+                await this.render();
+                await Dashboard.update();
+            } catch (e) {
+                Toast.show('Erro ao excluir serviço!', 'error');
+            }
+        });
+    },
+
     getStatusLabel(status) { return status === 'pending' ? 'Pendente' : 'Concluído'; },
 
     getPriorityLabel(priority) {
@@ -857,8 +945,6 @@ const Services = {
         try {
             const brasao = await Reports.loadBrasao();
             const today = new Date().toLocaleDateString('pt-BR');
-            const protocolo = Reports.generateProtocol();
-            const emitidoPor = AppState.currentUser ? AppState.currentUser.nome || AppState.currentUser.usuario : '';
             const dataSolic = service.data_servico   ? new Date(service.data_servico).toLocaleDateString('pt-BR')   : '-';
             const dataConc  = service.data_conclusao ? new Date(service.data_conclusao).toLocaleDateString('pt-BR') : '-';
             const statusLabel = service.status === 'pending' ? 'Pendente' : 'Concluído';
@@ -882,17 +968,19 @@ const Services = {
         .text-block { background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 4px;
                       padding: 12px 14px; font-size: 13px; line-height: 1.75; white-space: pre-wrap;
                       word-break: break-word; color: #333; margin: 0; }
+        .lbl { font-size: 10px; text-transform: uppercase; letter-spacing: 0.6px;
+               color: #888; display: block; margin-bottom: 2px; }
+        .val { font-size: 13px; color: #222; font-weight: 600; }
     </style>
 </head>
 <body>
     ${headerHtml}
 
     <div style="display:flex;justify-content:space-between;margin-bottom:18px;align-items:flex-end;">
-        <h2 style="margin:0;font-size:16px;color:#1a2744;">Ordem de Serviço</h2>
+        <h2 style="margin:0;font-size:16px;color:#1a2744;">Relatório de Serviço</h2>
         <div style="text-align:right;">
-            <span style="font-size:13px;font-weight:700;color:#1a2744;display:block;letter-spacing:0.5px;">Protocolo Nº ${protocolo}</span>
             <span style="font-size:11px;color:#777;display:block;">Emitido em: ${today}</span>
-            ${emitidoPor ? `<span style="font-size:11px;color:#777;display:block;">Emitido por: ${emitidoPor}</span>` : ''}
+            ${AppState.currentUser ? `<span style="font-size:11px;color:#777;display:block;">Emitido por: ${AppState.currentUser.nome || AppState.currentUser.usuario}</span>` : ''}
         </div>
     </div>
 
@@ -995,175 +1083,12 @@ const Services = {
 };
 
 // ==========================================
-// GERENCIADOR DE SOLICITAÇÕES
-// ==========================================
-const Solicitacoes = {
-    currentId: null,
-
-    async init() {
-        this.setupEventListeners();
-        await this.render();
-    },
-
-    setupEventListeners() {
-        document.getElementById('solicitacoesSearch').addEventListener('input', (e) => {
-            this.render(e.target.value, document.getElementById('solicitacoesStatusFilter').value);
-        });
-        document.getElementById('solicitacoesStatusFilter').addEventListener('change', (e) => {
-            this.render(document.getElementById('solicitacoesSearch').value, e.target.value);
-        });
-        document.getElementById('solSalvarBtn').addEventListener('click', () => this.salvarComoServico());
-    },
-
-    async render(searchTerm = '', statusFilter = '') {
-        try {
-            AppState.solicitacoes = await API.get('/api/solicitacoes');
-        } catch (e) { AppState.solicitacoes = []; }
-
-        const list       = document.getElementById('solicitacoesList');
-        const emptyState = document.getElementById('solicitacoesEmpty');
-
-        let items = [...AppState.solicitacoes];
-
-        if (searchTerm) {
-            const term = searchTerm.toLowerCase();
-            items = items.filter(s =>
-                (s.titulo || '').toLowerCase().includes(term) ||
-                (s.numero_so || '').toLowerCase().includes(term) ||
-                (s.cliente_setor || '').toLowerCase().includes(term) ||
-                (s.descricao || '').toLowerCase().includes(term)
-            );
-        }
-        if (statusFilter) items = items.filter(s => s.status === statusFilter);
-
-        // Atualiza badge na nav
-        const totalNovas = AppState.solicitacoes.filter(s => s.status === 'nova').length;
-        const badge = document.getElementById('solicitacoesBadge');
-        if (badge) {
-            badge.textContent = totalNovas;
-            badge.style.display = totalNovas > 0 ? 'inline' : 'none';
-        }
-
-        if (items.length === 0) {
-            list.style.display = 'none';
-            emptyState.classList.add('visible');
-            return;
-        }
-
-        list.style.display = 'flex';
-        emptyState.classList.remove('visible');
-
-        list.innerHTML = items.map(sol => {
-            const isNova  = sol.status === 'nova';
-            const isSalva = sol.status === 'salvo';
-            const data    = sol.data_solicitacao
-                ? new Date(sol.data_solicitacao).toLocaleDateString('pt-BR')
-                : new Date(sol.data_criacao).toLocaleDateString('pt-BR');
-
-            const statusHtml = isNova
-                ? '<span class="sol-status-badge nova">Nova</span>'
-                : '<span class="sol-status-badge salva">Convertida</span>';
-
-            const prioHtml = isSalva && sol.prioridade
-                ? '<span class="service-priority ' + sol.prioridade + '">' + this.getPrioLabel(sol.prioridade) + '</span>'
-                : '';
-
-            return '<div class="sol-card ' + (isNova ? 'sol-card--nova' : '') + '" onclick="Solicitacoes.openModal(\'' + sol.id + '\')">'
-                + '<div class="sol-card-left">'
-                + '<span class="sol-so-number">' + Inventory.escapeHtml(sol.numero_so) + '</span>'
-                + '<div class="sol-card-meta">' + statusHtml + prioHtml + '<span class="sol-date">' + data + '</span></div>'
-                + '</div>'
-                + '<div class="sol-card-body">'
-                + '<h4 class="sol-title">' + Inventory.escapeHtml(sol.titulo) + '</h4>'
-                + '<p class="sol-setor">' + Inventory.escapeHtml(sol.cliente_setor || '—') + '</p>'
-                + '<p class="sol-desc-preview">' + Inventory.escapeHtml((sol.descricao || '').substring(0, 120)) + (sol.descricao && sol.descricao.length > 120 ? '...' : '') + '</p>'
-                + '</div>'
-                + '<div class="sol-card-actions" onclick="event.stopPropagation()">'
-                + (isNova ? '<button class="btn btn-sm btn-primary" onclick="Solicitacoes.openModal(\'' + sol.id + '\')">Analisar</button>' : '')
-                + '</div>'
-                + '</div>';
-        }).join('');
-    },
-
-    openModal(id) {
-        this.currentId = id;
-        const sol = AppState.solicitacoes.find(s => String(s.id) === String(id));
-        if (!sol) return;
-
-        const isNova = sol.status === 'nova';
-        const data   = sol.data_solicitacao
-            ? new Date(sol.data_solicitacao).toLocaleDateString('pt-BR')
-            : new Date(sol.data_criacao).toLocaleDateString('pt-BR');
-
-        document.getElementById('solModalTitle').textContent = sol.numero_so;
-
-        document.getElementById('solModalMeta').innerHTML =
-            '<div class="sol-modal-so">' + Inventory.escapeHtml(sol.numero_so) + '</div>'
-            + '<div class="sol-modal-info">'
-            + '<span class="sol-status-badge ' + (isNova ? 'nova' : 'salva') + '">' + (isNova ? 'Nova' : 'Convertida') + '</span>'
-            + (sol.prioridade ? '<span class="service-priority ' + sol.prioridade + '">' + this.getPrioLabel(sol.prioridade) + '</span>' : '')
-            + '<span class="sol-info-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>' + Inventory.escapeHtml(sol.cliente_setor || '—') + '</span>'
-            + '<span class="sol-info-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>' + data + '</span>'
-            + (sol.servico_id ? '<span class="sol-info-item sol-info-item--link">✓ Serviço #' + sol.servico_id + ' criado</span>' : '')
-            + '</div>';
-
-        document.getElementById('solModalDescricao').textContent = sol.descricao;
-
-        const acoesEl   = document.getElementById('solModalAcoes');
-        const salvarBtn = document.getElementById('solSalvarBtn');
-        const excluirBtn = document.getElementById('solExcluirBtn');
-
-        if (isNova) {
-            acoesEl.style.display    = 'block';
-            salvarBtn.style.display  = 'inline-flex';
-            excluirBtn.style.display = 'inline-flex';
-            document.getElementById('solPrioridade').value = 'media';
-        } else {
-            acoesEl.style.display    = 'none';
-            salvarBtn.style.display  = 'none';
-            excluirBtn.style.display = 'inline-flex';
-        }
-
-        Modal.open('solicitacaoModal');
-    },
-
-    async salvarComoServico() {
-        const prioridade = document.getElementById('solPrioridade').value;
-        if (!prioridade) { Toast.show('Selecione a prioridade!', 'error'); return; }
-
-        const btn = document.getElementById('solSalvarBtn');
-        btn.disabled = true;
-        btn.textContent = 'Salvando...';
-
-        try {
-            await API.post('/api/solicitacoes/' + this.currentId + '/salvar-servico', { prioridade });
-            Toast.show('Serviço criado com sucesso!', 'success');
-            Modal.close('solicitacaoModal');
-            await this.render();
-            await Dashboard.update();
-            await Services.render();
-            await ActivityLogger.renderServices();
-        } catch (e) {
-            Toast.show('Erro ao salvar serviço!', 'error');
-        } finally {
-            btn.disabled = false;
-            btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg> Salvar como Serviço';
-        }
-    },
-
-    getPrioLabel(p) {
-        const l = { baixa: 'Baixa', media: 'Média', alta: 'Alta', urgente: 'Urgente' };
-        return l[p] || p;
-    }
-};
-
-
-// ==========================================
 // RELATÓRIOS
 // ==========================================
 const Reports = {
     pedidoItems: [],
     pedidoEditId: null,
+
     BRASAO_B64: null,
 
     async loadBrasao() {
@@ -1216,28 +1141,41 @@ const Reports = {
     _bindPedido() {
         const btnAdd   = document.getElementById('btnAdicionarPedido');
         const btnGerar = document.getElementById('btnGerarPedido');
-        if (btnAdd)   btnAdd.onclick  = () => this.adicionarItemPedido();
+        if (btnAdd)   btnAdd.onclick   = () => this.adicionarItemPedido();
         if (btnGerar) btnGerar.onclick = () => this.gerarPedido();
+        // Enter key on nome field adds item
+        const nomeEl = document.getElementById('pedidoNome');
+        if (nomeEl) nomeEl.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); this.adicionarItemPedido(); } });
     },
 
     adicionarItemPedido() {
-        const nome  = document.getElementById('pedidoNome').value.trim();
-        const qtd   = parseInt(document.getElementById('pedidoQtd').value) || 1;
-        const nivel = document.getElementById('pedidoNivel').value;
+        const nomeEl  = document.getElementById('pedidoNome');
+        const qtdEl   = document.getElementById('pedidoQtd');
+        const nivelEl = document.getElementById('pedidoNivel');
+        const especEl = document.getElementById('pedidoEspec');
+        const descEl  = document.getElementById('pedidoDesc');
+        if (!nomeEl) { console.error('pedidoNome not found'); return; }
+        const nome  = nomeEl.value.trim();
+        const qtd   = parseInt(qtdEl ? qtdEl.value : '1') || 1;
+        const nivel = nivelEl ? nivelEl.value : 'Média';
+        const espec = especEl ? especEl.value.trim() : '';
+        const desc  = descEl  ? descEl.value.trim()  : '';
         if (!nome) { Toast.show('Informe o nome do produto!', 'error'); return; }
-        this.pedidoItems.push({ id: Date.now(), nome, qtd, nivel });
-        document.getElementById('pedidoNome').value  = '';
-        document.getElementById('pedidoQtd').value   = '1';
-        document.getElementById('pedidoNivel').value = 'Média';
+        this.pedidoItems.push({ id: Date.now(), nome, qtd, nivel, espec, desc });
+        nomeEl.value  = '';
+        if (qtdEl)   qtdEl.value   = '1';
+        if (nivelEl) nivelEl.value = 'Média';
+        if (especEl) especEl.value = '';
+        if (descEl)  descEl.value  = '';
         this.renderPedidoList();
     },
 
     renderPedidoList() {
-        const list     = document.getElementById('pedidoItemsList');
-        const badge    = document.getElementById('pedidoBadge');
+        const list = document.getElementById('pedidoItemsList');
+        const badge = document.getElementById('pedidoBadge');
         const btnGerar = document.getElementById('btnGerarPedido');
-        badge.textContent  = this.pedidoItems.length;
-        btnGerar.disabled  = this.pedidoItems.length === 0;
+        badge.textContent = this.pedidoItems.length;
+        btnGerar.disabled = this.pedidoItems.length === 0;
 
         if (this.pedidoItems.length === 0) {
             list.innerHTML = '<div class="report-preview-empty"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg><p>Nenhum item adicionado ainda</p></div>';
@@ -1251,6 +1189,8 @@ const Reports = {
                         <span class="pedido-item-name">${Inventory.escapeHtml(item.nome)}</span>
                         <span class="pedido-item-qty">Qtd: ${item.qtd}</span>
                         <span class="pedido-item-nivel ${item.nivel}">${item.nivel}</span>
+                        ${item.espec ? `<span class="pedido-item-espec" title="Especificações">${Inventory.escapeHtml(item.espec)}</span>` : ''}
+                        ${item.desc  ? `<span class="pedido-item-desc"  title="Descrição">${Inventory.escapeHtml(item.desc)}</span>` : ''}
                         <div class="pedido-item-actions" style="margin-left:auto">
                             <button class="btn btn-sm btn-secondary" onclick="Reports.editarItem(${item.id})">Editar</button>
                             <button class="btn btn-sm btn-danger" onclick="Reports.excluirItem(${item.id})">Excluir</button>
@@ -1262,6 +1202,8 @@ const Reports = {
                         <select id="edit-nivel-${item.id}">
                             ${['Baixa','Média','Alta','Urgente'].map(n => `<option value="${n}"${n===item.nivel?' selected':''}>${n}</option>`).join('')}
                         </select>
+                        <input type="text" value="${Inventory.escapeHtml(item.espec||'')}" id="edit-espec-${item.id}" placeholder="Especificações" style="flex:1;min-width:120px">
+                        <input type="text" value="${Inventory.escapeHtml(item.desc||'')}"  id="edit-desc-${item.id}"  placeholder="Descrição" style="flex:1;min-width:120px">
                         <button class="btn btn-sm btn-primary" onclick="Reports.salvarEdicao(${item.id})">Salvar</button>
                         <button class="btn btn-sm btn-secondary" onclick="Reports.cancelarEdicao(${item.id})">Cancelar</button>
                     </div>
@@ -1284,11 +1226,13 @@ const Reports = {
     salvarEdicao(id) {
         const item = this.pedidoItems.find(i => i.id === id);
         if (!item) return;
-        const nome  = document.getElementById('edit-nome-' + id).value.trim();
-        const qtd   = parseInt(document.getElementById('edit-qtd-' + id).value) || 1;
+        const nome = document.getElementById('edit-nome-' + id).value.trim();
+        const qtd = parseInt(document.getElementById('edit-qtd-' + id).value) || 1;
         const nivel = document.getElementById('edit-nivel-' + id).value;
+        const espec = document.getElementById('edit-espec-' + id).value.trim();
+        const desc  = document.getElementById('edit-desc-' + id) ? document.getElementById('edit-desc-' + id).value.trim() : (item.desc||'');
         if (!nome) { Toast.show('Nome não pode ser vazio!', 'error'); return; }
-        item.nome = nome; item.qtd = qtd; item.nivel = nivel;
+        item.nome = nome; item.qtd = qtd; item.nivel = nivel; item.espec = espec; item.desc = desc;
         this.renderPedidoList();
     },
 
@@ -1296,6 +1240,8 @@ const Reports = {
         this.pedidoItems = this.pedidoItems.filter(i => i.id !== id);
         this.renderPedidoList();
     },
+
+    // ---- PDF GENERATION ----
 
     async _buildPdfHeader(brasao) {
         let headerHtml = '<div style="text-align:center;margin-bottom:24px;border-bottom:2px solid #1a2744;padding-bottom:16px;">';
@@ -1312,14 +1258,14 @@ const Reports = {
         return `
         <div style="margin-top:48px;padding-top:24px;">
             <div style="display:flex;justify-content:space-between;gap:24px;flex-wrap:wrap;">
-                <div style="flex:1;min-width:180px;text-align:center;">
+                <div style="flex:1;min-width:160px;text-align:center;">
                     <div style="border-top:1px solid #333;padding-top:8px;margin-top:40px;font-size:12px;color:#333;">Assinatura do Responsável</div>
                 </div>
-                <div style="flex:1;min-width:180px;text-align:center;">
-                    <div style="border-top:1px solid #333;padding-top:8px;margin-top:40px;font-size:12px;color:#333;">Assinatura de Recebido por</div>
+                <div style="flex:1;min-width:120px;text-align:center;">
+                    <div style="padding-top:8px;margin-top:40px;font-size:12px;color:#333;border:1px solid #ccc;border-radius:4px;padding:8px;">Data: ___/___/______</div>
                 </div>
-                <div style="flex:1;min-width:130px;text-align:center;">
-                    <div style="padding-top:8px;margin-top:40px;font-size:12px;color:#333;">Data: ___/___/______</div>
+                <div style="flex:1;min-width:160px;text-align:center;">
+                    <div style="border-top:1px solid #333;padding-top:8px;margin-top:40px;font-size:12px;color:#333;">Assinatura de Recebido por</div>
                 </div>
             </div>
         </div>`;
@@ -1331,10 +1277,10 @@ const Reports = {
             if (items.length === 0) {
                 try { items = await API.get('/api/estoque'); } catch(e) { items = []; }
             }
-            const brasao     = await this.loadBrasao();
+            const brasao = await this.loadBrasao();
             const categorias = ['hardware', 'software', 'perifericos', 'cabos', 'rede', 'outros'];
-            const catLabels  = { hardware: 'Hardware', software: 'Software', perifericos: 'Periféricos', cabos: 'Cabos', rede: 'Rede', outros: 'Outros' };
-            const grouped    = {};
+            const catLabels = { hardware: 'Hardware', software: 'Software', perifericos: 'Periféricos', cabos: 'Cabos', rede: 'Rede', outros: 'Outros' };
+            const grouped = {};
             categorias.forEach(c => { grouped[c] = []; });
             items.forEach(item => {
                 const cat = (item.categoria || 'outros').toLowerCase();
@@ -1354,13 +1300,14 @@ const Reports = {
                 });
             });
 
-            const today      = new Date().toLocaleDateString('pt-BR');
+            const today = new Date().toLocaleDateString('pt-BR');
+            const emitidoPorEstoque = AppState.currentUser ? AppState.currentUser.nome || AppState.currentUser.usuario : '';
             const headerHtml = await this._buildPdfHeader(brasao);
             const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><style>body{font-family:Arial,sans-serif;margin:40px;color:#222;}table{width:100%;border-collapse:collapse;}th{background:#1a2744;color:#fff;padding:10px 12px;font-size:13px;text-align:left;}th:last-child{text-align:center;width:100px;}</style></head><body>
             ${headerHtml}
             <div style="display:flex;justify-content:space-between;margin-bottom:16px;align-items:flex-end;">
                 <h2 style="margin:0;font-size:16px;color:#1a2744;">Relatório de Estoque</h2>
-                <span style="font-size:11px;color:#777;">Emitido em: ${today}</span>
+                <div style="text-align:right;"><span style="font-size:11px;color:#777;display:block;">Emitido em: ${today}</span>${emitidoPorEstoque ? `<span style="font-size:11px;color:#777;display:block;">Emitido por: ${emitidoPorEstoque}</span>` : ''}</div>
             </div>
             <table>
                 <thead><tr><th>Nome do Item</th><th style="text-align:center;">Quantidade</th></tr></thead>
@@ -1368,6 +1315,7 @@ const Reports = {
             </table>
             ${this._buildPdfFooter()}
             </body></html>`;
+
             this._printHtml(html, 'Relatorio_Estoque');
         } catch(e) {
             Toast.show('Erro ao gerar relatório!', 'error');
@@ -1383,34 +1331,41 @@ const Reports = {
             const filterVal = document.getElementById('reportServicosFilter').value;
             if (filterVal) services = services.filter(s => s.status === filterVal);
             const brasao = await this.loadBrasao();
-            const today  = new Date().toLocaleDateString('pt-BR');
+            const today = new Date().toLocaleDateString('pt-BR');
+            const emitidoPorServicos = AppState.currentUser ? AppState.currentUser.nome || AppState.currentUser.usuario : '';
 
             let tableRows = services.map((s, i) => {
-                const bg   = i % 2 === 0 ? '#f9fafb' : '#fff';
-                const date = s.data_servico ? new Date(s.data_servico).toLocaleDateString('pt-BR') : '-';
+                const bg = i % 2 === 0 ? '#f9fafb' : '#fff';
+                const dataSolic = s.data_servico ? new Date(s.data_servico).toLocaleDateString('pt-BR') : '-';
+                const dataConc  = s.data_conclusao ? new Date(s.data_conclusao).toLocaleDateString('pt-BR') : '-';
+                const statusLabel = s.status === 'pending' ? 'Pendente' : 'Concluído';
+                const statusColor = s.status === 'pending' ? '#d97706' : '#059669';
                 return `<tr style="background:${bg}">
                     <td style="padding:8px 10px;border-bottom:1px solid #e5e7eb;font-size:12px;font-weight:600;">${Inventory.escapeHtml(s.titulo)}</td>
                     <td style="padding:8px 10px;border-bottom:1px solid #e5e7eb;font-size:12px;">${Inventory.escapeHtml(s.cliente_setor||'-')}</td>
-                    <td style="padding:8px 10px;border-bottom:1px solid #e5e7eb;font-size:12px;white-space:nowrap;">${date}</td>
+                    <td style="padding:8px 10px;border-bottom:1px solid #e5e7eb;font-size:12px;white-space:nowrap;">${dataSolic}</td>
+                    <td style="padding:8px 10px;border-bottom:1px solid #e5e7eb;font-size:12px;white-space:nowrap;">${dataConc}</td>
+                    <td style="padding:8px 10px;border-bottom:1px solid #e5e7eb;font-size:12px;"><span style="color:${statusColor};font-weight:700;">${statusLabel}</span></td>
                     <td style="padding:8px 10px;border-bottom:1px solid #e5e7eb;font-size:12px;">${Inventory.escapeHtml(s.descricao||'')}</td>
                 </tr>`;
             }).join('');
 
-            if (!tableRows) tableRows = '<tr><td colspan="4" style="text-align:center;padding:20px;color:#999;font-size:13px;">Nenhum serviço encontrado</td></tr>';
+            if (!tableRows) tableRows = '<tr><td colspan="6" style="text-align:center;padding:20px;color:#999;font-size:13px;">Nenhum serviço encontrado</td></tr>';
 
             const headerHtml = await this._buildPdfHeader(brasao);
             const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><style>body{font-family:Arial,sans-serif;margin:40px;color:#222;}table{width:100%;border-collapse:collapse;}th{background:#1a2744;color:#fff;padding:10px 10px;font-size:12px;text-align:left;}</style></head><body>
             ${headerHtml}
             <div style="display:flex;justify-content:space-between;margin-bottom:16px;align-items:flex-end;">
                 <h2 style="margin:0;font-size:16px;color:#1a2744;">Relatório de Serviços</h2>
-                <span style="font-size:11px;color:#777;">Emitido em: ${today}</span>
+                <div style="text-align:right;"><span style="font-size:11px;color:#777;display:block;">Emitido em: ${today}</span>${emitidoPorServicos ? `<span style="font-size:11px;color:#777;display:block;">Emitido por: ${emitidoPorServicos}</span>` : ''}</div>
             </div>
             <table>
-                <thead><tr><th>Título</th><th>Setor/Cliente</th><th>Data</th><th>Descrição</th></tr></thead>
+                <thead><tr><th>Título</th><th>Setor/Cliente</th><th style="width:110px;">Data de Solicitação</th><th style="width:110px;">Data de Conclusão</th><th style="width:90px;">Status</th><th>Descrição</th></tr></thead>
                 <tbody>${tableRows}</tbody>
             </table>
             ${this._buildPdfFooter()}
             </body></html>`;
+
             this._printHtml(html, 'Relatorio_Servicos');
         } catch(e) {
             Toast.show('Erro ao gerar relatório!', 'error');
@@ -1420,15 +1375,19 @@ const Reports = {
     async gerarPedido() {
         if (this.pedidoItems.length === 0) { Toast.show('Adicione itens ao pedido!', 'error'); return; }
         const brasao = await this.loadBrasao();
-        const today  = new Date().toLocaleDateString('pt-BR');
+        const today = new Date().toLocaleDateString('pt-BR');
+        const emitidoPorPedido = AppState.currentUser ? AppState.currentUser.nome || AppState.currentUser.usuario : '';
+
         const nivelColor = { Baixa: '#059669', Média: '#d97706', Alta: '#ea580c', Urgente: '#dc2626' };
 
         let tableRows = this.pedidoItems.map((item, i) => {
-            const bg  = i % 2 === 0 ? '#f9fafb' : '#fff';
+            const bg = i % 2 === 0 ? '#f9fafb' : '#fff';
             const cor = nivelColor[item.nivel] || '#333';
             return `<tr style="background:${bg}">
                 <td style="padding:9px 12px;border-bottom:1px solid #e5e7eb;font-size:13px;">${i+1}</td>
                 <td style="padding:9px 12px;border-bottom:1px solid #e5e7eb;font-size:13px;font-weight:600;">${Inventory.escapeHtml(item.nome)}</td>
+                <td style="padding:9px 12px;border-bottom:1px solid #e5e7eb;font-size:13px;color:#555;">${Inventory.escapeHtml(item.espec||'-')}</td>
+                <td style="padding:9px 12px;border-bottom:1px solid #e5e7eb;font-size:13px;color:#555;">${Inventory.escapeHtml(item.desc||'-')}</td>
                 <td style="padding:9px 12px;border-bottom:1px solid #e5e7eb;font-size:13px;text-align:center;">${item.qtd}</td>
                 <td style="padding:9px 12px;border-bottom:1px solid #e5e7eb;font-size:13px;text-align:center;"><span style="color:${cor};font-weight:700;">${item.nivel}</span></td>
             </tr>`;
@@ -1439,14 +1398,15 @@ const Reports = {
         ${headerHtml}
         <div style="display:flex;justify-content:space-between;margin-bottom:16px;align-items:flex-end;">
             <h2 style="margin:0;font-size:16px;color:#1a2744;">Pedido de Reposição de Estoque</h2>
-            <span style="font-size:11px;color:#777;">Emitido em: ${today}</span>
+            <div style="text-align:right;"><span style="font-size:11px;color:#777;display:block;">Emitido em: ${today}</span>${emitidoPorPedido ? `<span style="font-size:11px;color:#777;display:block;">Emitido por: ${emitidoPorPedido}</span>` : ''}</div>
         </div>
         <table>
-            <thead><tr><th style="width:40px;">#</th><th>Nome do Produto</th><th style="width:100px;text-align:center;">Quantidade</th><th style="width:130px;text-align:center;">Nível de Necessidade</th></tr></thead>
+            <thead><tr><th style="width:40px;">#</th><th>Nome do Produto</th><th>Especificações</th><th>Descrição</th><th style="width:80px;text-align:center;">Qtd</th><th style="width:110px;text-align:center;">Nível</th></tr></thead>
             <tbody>${tableRows}</tbody>
         </table>
         ${this._buildPdfFooter()}
         </body></html>`;
+
         this._printHtml(html, 'Pedido_Reposicao');
     },
 
@@ -1455,7 +1415,174 @@ const Reports = {
         if (!win) { Toast.show('Permita popups para gerar o PDF!', 'error'); return; }
         win.document.write(html);
         win.document.close();
-        win.onload = () => { setTimeout(() => { win.print(); }, 500); };
+        win.onload = () => {
+            setTimeout(() => {
+                win.print();
+            }, 500);
+        };
+    }
+};
+
+// ==========================================
+// GERENCIADOR DE SOLICITAÇÕES
+// ==========================================
+const Solicitacoes = {
+    currentId: null,
+
+    async init() {
+        this.setupEventListeners();
+        await this.render();
+    },
+
+    setupEventListeners() {
+        document.getElementById('solicitacoesSearch').addEventListener('input', (e) => {
+            this.render(e.target.value, document.getElementById('solicitacoesStatusFilter').value);
+        });
+        document.getElementById('solicitacoesStatusFilter').addEventListener('change', (e) => {
+            this.render(document.getElementById('solicitacoesSearch').value, e.target.value);
+        });
+        document.getElementById('solSalvarBtn').addEventListener('click', () => this.salvarComoServico());
+        document.getElementById('solExcluirBtn').addEventListener('click', () => this.excluirSolicitacao());
+    },
+
+    async render(searchTerm = '', statusFilter = '') {
+        try {
+            AppState.solicitacoes = await API.get('/api/solicitacoes');
+        } catch (e) { AppState.solicitacoes = []; }
+
+        const list       = document.getElementById('solicitacoesList');
+        const emptyState = document.getElementById('solicitacoesEmpty');
+
+        let items = [...AppState.solicitacoes];
+        if (searchTerm) {
+            const term = searchTerm.toLowerCase();
+            items = items.filter(s =>
+                (s.titulo || '').toLowerCase().includes(term) ||
+                (s.numero_so || '').toLowerCase().includes(term) ||
+                (s.cliente_setor || '').toLowerCase().includes(term) ||
+                (s.descricao || '').toLowerCase().includes(term)
+            );
+        }
+        if (statusFilter) items = items.filter(s => s.status === statusFilter);
+
+        const totalNovas = AppState.solicitacoes.filter(s => s.status === 'nova').length;
+        const badge = document.getElementById('solicitacoesBadge');
+        if (badge) { badge.textContent = totalNovas; badge.style.display = totalNovas > 0 ? 'inline' : 'none'; }
+
+        if (items.length === 0) {
+            list.style.display = 'none';
+            emptyState.classList.add('visible');
+            return;
+        }
+
+        list.style.display = 'flex';
+        emptyState.classList.remove('visible');
+
+        list.innerHTML = items.map(sol => {
+            const isNova  = sol.status === 'nova';
+            const data    = sol.data_solicitacao
+                ? new Date(sol.data_solicitacao).toLocaleDateString('pt-BR')
+                : new Date(sol.data_criacao).toLocaleDateString('pt-BR');
+            const statusHtml = isNova
+                ? '<span class="sol-status-badge nova">Nova</span>'
+                : '<span class="sol-status-badge salva">Convertida</span>';
+            const prioHtml = sol.prioridade
+                ? '<span class="service-priority ' + sol.prioridade + '">' + this.getPrioLabel(sol.prioridade) + '</span>'
+                : '';
+            return '<div class="sol-card ' + (isNova ? 'sol-card--nova' : '') + '" onclick="Solicitacoes.openModal(\'' + sol.id + '\')">'
+                + '<div class="sol-card-left">'
+                + '<span class="sol-so-number">' + Inventory.escapeHtml(sol.numero_so) + '</span>'
+                + '<div class="sol-card-meta">' + statusHtml + prioHtml + '<span class="sol-date">' + data + '</span></div>'
+                + '</div>'
+                + '<div class="sol-card-body">'
+                + '<h4 class="sol-title">' + Inventory.escapeHtml(sol.titulo) + '</h4>'
+                + '<p class="sol-setor">' + Inventory.escapeHtml(sol.cliente_setor || '—') + '</p>'
+                + '<p class="sol-desc-preview">' + Inventory.escapeHtml((sol.descricao || '').substring(0, 120)) + (sol.descricao && sol.descricao.length > 120 ? '...' : '') + '</p>'
+                + '</div>'
+                + '<div class="sol-card-actions" onclick="event.stopPropagation()">'
+                + (isNova ? '<button class="btn btn-sm btn-primary" onclick="Solicitacoes.openModal(\'' + sol.id + '\')">Analisar</button>' : '')
+                + '<button class="btn btn-sm btn-danger btn-icon" onclick="Solicitacoes.confirmarExcluir(\'' + sol.id + '\',\'' + Inventory.escapeHtml(sol.numero_so) + '\')" title="Excluir"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>'
+                + '</div>'
+                + '</div>';
+        }).join('');
+    },
+
+    openModal(id) {
+        this.currentId = id;
+        const sol = AppState.solicitacoes.find(s => String(s.id) === String(id));
+        if (!sol) return;
+        const isNova = sol.status === 'nova';
+        const data   = sol.data_solicitacao
+            ? new Date(sol.data_solicitacao).toLocaleDateString('pt-BR')
+            : new Date(sol.data_criacao).toLocaleDateString('pt-BR');
+
+        document.getElementById('solModalTitle').textContent = sol.numero_so;
+        document.getElementById('solModalMeta').innerHTML =
+            '<div class="sol-modal-so">' + Inventory.escapeHtml(sol.numero_so) + '</div>'
+            + '<div class="sol-modal-info">'
+            + '<span class="sol-status-badge ' + (isNova ? 'nova' : 'salva') + '">' + (isNova ? 'Nova' : 'Convertida') + '</span>'
+            + (sol.prioridade ? '<span class="service-priority ' + sol.prioridade + '">' + this.getPrioLabel(sol.prioridade) + '</span>' : '')
+            + '<span class="sol-info-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>' + Inventory.escapeHtml(sol.cliente_setor || '—') + '</span>'
+            + '<span class="sol-info-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>' + data + '</span>'
+            + (sol.servico_id ? '<span class="sol-info-item sol-info-item--link">✓ Serviço #' + sol.servico_id + ' criado</span>' : '')
+            + '</div>';
+
+        document.getElementById('solModalDescricao').textContent = sol.descricao;
+        document.getElementById('solModalAcoes').style.display   = isNova ? 'block' : 'none';
+        document.getElementById('solSalvarBtn').style.display    = isNova ? 'inline-flex' : 'none';
+        document.getElementById('solExcluirBtn').style.display   = 'inline-flex';
+        if (isNova) document.getElementById('solPrioridade').value = 'media';
+        Modal.open('solicitacaoModal');
+    },
+
+    async salvarComoServico() {
+        const prioridade = document.getElementById('solPrioridade').value;
+        if (!prioridade) { Toast.show('Selecione a prioridade!', 'error'); return; }
+        const btn = document.getElementById('solSalvarBtn');
+        btn.disabled = true;
+        btn.textContent = 'Salvando...';
+        try {
+            await API.post('/api/solicitacoes/' + this.currentId + '/salvar-servico', { prioridade });
+            Toast.show('Serviço criado com sucesso!', 'success');
+            Modal.close('solicitacaoModal');
+            await this.render();
+            await Dashboard.update();
+            await Services.render();
+            await ActivityLogger.renderServices();
+        } catch (e) {
+            Toast.show((e && e.error) ? e.error : 'Erro ao salvar serviço!', 'error');
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg> Salvar como Serviço';
+        }
+    },
+
+    excluirSolicitacao() {
+        if (!this.currentId) return;
+        Modal.close('solicitacaoModal');
+        Modal.confirm('Excluir Solicitação', 'Tem certeza que deseja excluir esta solicitação?', async () => {
+            try {
+                await API.delete('/api/solicitacoes/' + this.currentId);
+                Toast.show('Solicitação excluída!', 'success');
+                await this.render();
+                await Dashboard.update();
+            } catch (e) { Toast.show('Erro ao excluir!', 'error'); }
+        });
+    },
+
+    confirmarExcluir(id, numeroSo) {
+        Modal.confirm('Excluir Solicitação', 'Excluir a solicitação ' + numeroSo + '?', async () => {
+            try {
+                await API.delete('/api/solicitacoes/' + id);
+                Toast.show('Solicitação excluída!', 'success');
+                await this.render();
+                await Dashboard.update();
+            } catch (e) { Toast.show('Erro ao excluir!', 'error'); }
+        });
+    },
+
+    getPrioLabel(p) {
+        return { baixa:'Baixa', media:'Média', alta:'Alta', urgente:'Urgente' }[p] || p;
     }
 };
 
@@ -1486,11 +1613,37 @@ const Navigation = {
         });
 
         document.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape') Modal.closeAll();
+            if (e.key === 'Escape') { Modal.closeAll(); this.closeSidebar(); }
         });
+
+        // Mobile sidebar
+        const menuBtn  = document.getElementById('mobileMenuBtn');
+        const backdrop = document.getElementById('sidebarBackdrop');
+        if (menuBtn)  menuBtn.addEventListener('click', () => this.toggleSidebar());
+        if (backdrop) backdrop.addEventListener('click', () => this.closeSidebar());
+    },
+
+    toggleSidebar() {
+        const sidebar = document.getElementById('sidebar');
+        sidebar && sidebar.classList.contains('open') ? this.closeSidebar() : this.openSidebar();
+    },
+    openSidebar() {
+        const s = document.getElementById('sidebar');
+        const b = document.getElementById('sidebarBackdrop');
+        if (s) s.classList.add('open');
+        if (b) b.classList.add('visible');
+        document.body.style.overflow = 'hidden';
+    },
+    closeSidebar() {
+        const s = document.getElementById('sidebar');
+        const b = document.getElementById('sidebarBackdrop');
+        if (s) s.classList.remove('open');
+        if (b) b.classList.remove('visible');
+        if (!document.querySelector('.modal-overlay.visible')) document.body.style.overflow = '';
     },
 
     switchTab(tabId) {
+        this.closeSidebar();
         document.querySelectorAll('.nav-item').forEach(item => {
             item.classList.toggle('active', item.dataset.tab === tabId);
         });
@@ -1504,11 +1657,11 @@ const Navigation = {
                 ActivityLogger.renderInventory();
                 ActivityLogger.renderServices();
                 break;
-            case 'inventory':     Inventory.render();     break;
-            case 'snippets':      Snippets.render();      break;
-            case 'services':      Services.render();      break;
-            case 'solicitacoes':  Solicitacoes.render();  break;
-            case 'reports':       Reports.init();         break;
+            case 'inventory': Inventory.render(); break;
+            case 'snippets': Snippets.render(); break;
+            case 'services': Services.render(); break;
+            case 'solicitacoes': Solicitacoes.render(); break;
+            case 'reports': Reports.init(); break;
         }
     }
 };

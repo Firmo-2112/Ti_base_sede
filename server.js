@@ -4,17 +4,14 @@
 // ==========================================
 
 const express = require('express');
-const mysql = require('mysql2/promise');
-const cors = require('cors');
-const path = require('path');
+const mysql   = require('mysql2/promise');
+const cors    = require('cors');
+const path    = require('path');
 
 const app = express();
 app.use(express.json());
 app.use(cors());
 
-// Arquivos estáticos serão servidos APÓS as rotas de API (veja no final do arquivo)
-
-// Headers anti-cache para JS e CSS — garante que o navegador sempre baixe a versão mais recente
 app.use((req, res, next) => {
     if (req.path.endsWith('.js') || req.path.endsWith('.css')) {
         res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
@@ -24,32 +21,41 @@ app.use((req, res, next) => {
     next();
 });
 
-// ==========================================
-// CONEXÃO COM O BANCO DE DADOS
-// ==========================================
 const dbConfig = {
-    host: process.env.MYSQLHOST || 'mysql.railway.internal',
-    port: parseInt(process.env.MYSQLPORT) || 3306,
-    user: process.env.MYSQLUSER || 'root',
-    password: process.env.MYSQLPASSWORD || 'OhogquOKFnLPXoQPaHKLyuSVOUUhQZqa',
-    database: process.env.MYSQLDATABASE || 'railway',
+    host:               process.env.MYSQLHOST     || 'mysql.railway.internal',
+    port:               parseInt(process.env.MYSQLPORT) || 3306,
+    user:               process.env.MYSQLUSER     || 'root',
+    password:           process.env.MYSQLPASSWORD || 'OhogquOKFnLPXoQPaHKLyuSVOUUhQZqa',
+    database:           process.env.MYSQLDATABASE || 'railway',
     waitForConnections: true,
-    connectionLimit: 10,
-    queueLimit: 0
+    connectionLimit:    10,
+    queueLimit:         0
 };
 
 const pool = mysql.createPool(dbConfig);
 
-// ==========================================
-// MIGRAÇÃO AUTOMÁTICA — cria tabelas ausentes
-// Roda toda vez que o servidor inicia
-// ==========================================
-async function runMigrations() {
+async function columnExists(table, column) {
     try {
-        const conn = await pool.getConnection();
+        const [rows] = await pool.execute(
+            `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?`,
+            [table, column]
+        );
+        return rows.length > 0;
+    } catch(e) { return false; }
+}
 
-        // Tabela solicitacoes
-        await conn.execute(`
+async function runMigrations() {
+    const toAdd = [
+        { table: 'atividades', col: 'usuario_id',    def: 'INT DEFAULT NULL' },
+        { table: 'atividades', col: 'usuario_nome',  def: 'VARCHAR(100) DEFAULT NULL' },
+        { table: 'atividades', col: 'snapshot',      def: 'JSON DEFAULT NULL' },
+        { table: 'servicos',   col: 'criado_por',    def: 'VARCHAR(100) DEFAULT NULL' },
+        { table: 'servicos',   col: 'modificado_por',def: 'VARCHAR(100) DEFAULT NULL' },
+        { table: 'servicos',   col: 'usuario_id',    def: 'INT DEFAULT NULL' },
+    ];
+    // Criar tabela solicitacoes se não existir
+    try {
+        await pool.execute(`
             CREATE TABLE IF NOT EXISTS solicitacoes (
                 id               INT NOT NULL AUTO_INCREMENT,
                 numero_so        VARCHAR(20)  NOT NULL,
@@ -64,132 +70,144 @@ async function runMigrations() {
                 data_atualizacao DATETIME     DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
                 PRIMARY KEY (id),
                 UNIQUE KEY unique_numero_so (numero_so),
-                KEY idx_sol_status (status),
-                KEY idx_sol_numero (numero_so),
+                KEY idx_sol_status  (status),
+                KEY idx_sol_numero  (numero_so),
                 KEY idx_sol_criacao (data_criacao)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
         `);
+        console.log('  + Tabela solicitacoes OK');
+    } catch(e) { console.error('  ! Tabela solicitacoes:', e.message); }
 
-        conn.release();
-        console.log('✅ Migrações executadas com sucesso');
-    } catch (err) {
-        console.error('⚠️  Erro nas migrações:', err.message);
+    // Atualizar view com coluna solicitacoes_novas
+    try {
+        await pool.execute(`
+            CREATE OR REPLACE VIEW dashboard_resumo AS
+            SELECT
+                (SELECT COUNT(*) FROM estoque_itens WHERE ativo=1) AS total_itens_estoque,
+                (SELECT COUNT(*) FROM estoque_itens WHERE ativo=1 AND quantidade<=estoque_minimo) AS itens_estoque_baixo,
+                (SELECT COUNT(*) FROM snippets WHERE ativo=1) AS total_snippets,
+                (SELECT COUNT(*) FROM servicos WHERE status='pending') AS servicos_pendentes,
+                (SELECT COUNT(*) FROM servicos WHERE status='completed') AS servicos_concluidos,
+                (SELECT COUNT(*) FROM solicitacoes WHERE status='nova') AS solicitacoes_novas
+        `);
+        console.log('  + View dashboard_resumo atualizada');
+    } catch(e) { console.warn('  ! View dashboard_resumo:', e.message); }
+
+    let applied = 0;
+    for (const { table, col, def } of toAdd) {
+        try {
+            const exists = await columnExists(table, col);
+            if (!exists) {
+                await pool.execute(`ALTER TABLE ${table} ADD COLUMN ${col} ${def}`);
+                console.log(`  + Added ${table}.${col}`);
+                applied++;
+            }
+        } catch (e) {
+            console.error(`  ! Failed ${table}.${col}:`, e.message);
+        }
     }
+    console.log(`Migrações: ${applied} coluna(s) adicionada(s).`);
+    return applied;
 }
 
-// ==========================================
-// HEALTHCHECK — Railway precisa deste endpoint
-// ==========================================
-app.get('/health', (req, res) => {
-    res.status(200).json({ status: 'ok' });
+app.get('/health', (req, res) => res.status(200).json({ status: 'ok' }));
+
+// Debug endpoint — shows what headers server receives
+app.get('/api/debug', requireAuth, async (req, res) => {
+    res.json({
+        user_nome_header: req.headers['x-user-nome'] || null,
+        user_id_header:   req.headers['x-user-id']   || null,
+        decoded_nome:     req.headers['x-user-nome'] ? decodeURIComponent(req.headers['x-user-nome']) : null,
+        server_version:   'v2-with-user-tracking'
+    });
 });
 
-// ==========================================
-// MIDDLEWARE DE AUTENTICAÇÃO (SESSÃO SIMPLES)
-// ==========================================
-function requireAuth(req, res, next) {
-    const token = req.headers['x-auth-token'];
-    if (token === 'setor-ti-authenticated') {
-        next();
-    } else {
-        res.status(401).json({ error: 'Não autorizado' });
+// Manual migration trigger — call from browser: GET /api/migrate?token=setor-ti-authenticated
+app.get('/api/migrate', async (req, res) => {
+    if (req.query.token !== 'setor-ti-authenticated' && req.headers['x-auth-token'] !== 'setor-ti-authenticated')
+        return res.status(401).json({ error: 'Unauthorized' });
+    try {
+        const applied = await runMigrations();
+        res.json({ success: true, message: `Migração concluída. ${applied} coluna(s) adicionada(s).` });
+    } catch(e) {
+        res.status(500).json({ error: e.message });
     }
+});
+
+function requireAuth(req, res, next) {
+    if (req.headers['x-auth-token'] === 'setor-ti-authenticated') return next();
+    res.status(401).json({ error: 'Não autorizado' });
+}
+function getUserNome(req) {
+    const h = req.headers['x-user-nome'];
+    return h ? decodeURIComponent(h) : null;
+}
+function getUserId(req) {
+    const id = req.headers['x-user-id'];
+    return id ? parseInt(id) : null;
 }
 
-// ==========================================
-// ROTAS DE AUTENTICAÇÃO
-// ==========================================
 app.post('/api/login', async (req, res) => {
     const { usuario, senha } = req.body;
     try {
-        const [rows] = await pool.execute(
-            'SELECT * FROM usuarios WHERE usuario = ? AND ativo = 1',
-            [usuario]
-        );
-        if (rows.length === 0) {
-            return res.status(401).json({ error: 'usuario', message: 'O usuário está errado!!' });
-        }
+        const [rows] = await pool.execute('SELECT * FROM usuarios WHERE usuario = ? AND ativo = 1', [usuario]);
+        if (!rows.length) return res.status(401).json({ error: 'usuario', message: 'O usuário está errado!!' });
         const user = rows[0];
-        if (user.senha !== senha) {
-            return res.status(401).json({ error: 'senha', message: 'A senha está errada!!' });
-        }
-        res.json({
-            success: true,
-            token: 'setor-ti-authenticated',
-            user: { id: user.id, usuario: user.usuario, nome: user.nome_completo }
-        });
-    } catch (err) {
-        console.error('Erro no login:', err);
-        res.status(500).json({ error: 'Erro interno do servidor' });
-    }
+        if (user.senha !== senha) return res.status(401).json({ error: 'senha', message: 'A senha está errada!!' });
+        res.json({ success: true, token: 'setor-ti-authenticated',
+                   user: { id: user.id, usuario: user.usuario, nome: user.nome_completo } });
+    } catch (err) { res.status(500).json({ error: 'Erro interno' }); }
 });
 
-// ==========================================
-// ROTAS DE DASHBOARD
-// ==========================================
 app.get('/api/dashboard', requireAuth, async (req, res) => {
     try {
-        const [summary] = await pool.execute('SELECT * FROM dashboard_resumo');
-        const [recentInventory] = await pool.execute(
-            'SELECT * FROM atividades WHERE tipo = ? ORDER BY data_atividade DESC LIMIT 10',
-            ['inventory']
-        );
-        const [recentServices] = await pool.execute(
-            'SELECT * FROM atividades WHERE tipo = ? ORDER BY data_atividade DESC LIMIT 10',
-            ['services']
-        );
-        // Contagem de solicitações novas para badge
-        let solicitacoesNovas = 0;
+        const [summary]         = await pool.execute('SELECT * FROM dashboard_resumo');
+        // Explicit columns — graceful fallback if new cols not yet migrated
+        let recentInventory = [], recentServices = [];
+        const COLS = 'id, tipo, acao, detalhes, data_atividade, usuario_nome, usuario_id, snapshot';
+        const BASE = 'id, tipo, acao, detalhes, data_atividade';
         try {
-            const [solRows] = await pool.execute(
-                "SELECT COUNT(*) as total FROM solicitacoes WHERE status = 'nova'"
-            );
-            solicitacoesNovas = solRows[0].total || 0;
-        } catch (e) { /* tabela pode não existir ainda */ }
-
-        res.json({
-            summary: { ...(summary[0] || {}), solicitacoes_novas: solicitacoesNovas },
-            recentInventory,
-            recentServices
+            [recentInventory] = await pool.execute(
+                `SELECT ${COLS} FROM atividades WHERE tipo = ? ORDER BY data_atividade DESC LIMIT 10`, ['inventory']);
+        } catch(e1) {
+            [recentInventory] = await pool.execute(
+                `SELECT ${BASE} FROM atividades WHERE tipo = ? ORDER BY data_atividade DESC LIMIT 10`, ['inventory']);
+        }
+        try {
+            [recentServices] = await pool.execute(
+                `SELECT ${COLS} FROM atividades WHERE tipo = ? ORDER BY data_atividade DESC LIMIT 10`, ['services']);
+        } catch(e2) {
+            [recentServices] = await pool.execute(
+                `SELECT ${BASE} FROM atividades WHERE tipo = ? ORDER BY data_atividade DESC LIMIT 10`, ['services']);
+        }
+        recentServices.forEach(a => {
+            if (a.snapshot && typeof a.snapshot === 'string') {
+                try { a.snapshot = JSON.parse(a.snapshot); } catch(e) { a.snapshot = null; }
+            }
         });
-    } catch (err) {
-        console.error('Erro no dashboard:', err);
-        res.status(500).json({ error: 'Erro ao carregar dashboard' });
-    }
+        res.json({ summary: summary[0] || {}, recentInventory, recentServices });
+    } catch (err) { res.status(500).json({ error: 'Erro ao carregar dashboard' }); }
 });
 
-// ==========================================
-// ROTAS DE ESTOQUE
-// ==========================================
 app.get('/api/estoque', requireAuth, async (req, res) => {
     try {
-        const [rows] = await pool.execute(
-            'SELECT * FROM estoque_itens WHERE ativo = 1 ORDER BY data_criacao DESC'
-        );
+        const [rows] = await pool.execute('SELECT * FROM estoque_itens WHERE ativo = 1 ORDER BY data_criacao DESC');
         res.json(rows);
-    } catch (err) {
-        console.error('Erro ao listar estoque:', err);
-        res.status(500).json({ error: 'Erro ao listar estoque' });
-    }
+    } catch (err) { res.status(500).json({ error: 'Erro ao listar estoque' }); }
 });
 
 app.post('/api/estoque', requireAuth, async (req, res) => {
     const { nome, categoria, quantidade, estoque_minimo, localizacao, descricao } = req.body;
-    if (!nome || !categoria) {
-        return res.status(400).json({ error: 'Nome e categoria são obrigatórios' });
-    }
+    if (!nome || !categoria) return res.status(400).json({ error: 'Nome e categoria obrigatórios' });
     try {
         const [result] = await pool.execute(
-            'INSERT INTO estoque_itens (nome, categoria, quantidade, estoque_minimo, localizacao, descricao) VALUES (?, ?, ?, ?, ?, ?)',
-            [nome, categoria, quantidade || 0, estoque_minimo || 5, localizacao || '', descricao || '']
+            'INSERT INTO estoque_itens (nome,categoria,quantidade,estoque_minimo,localizacao,descricao) VALUES (?,?,?,?,?,?)',
+            [nome, categoria, quantidade||0, estoque_minimo||5, localizacao||'', descricao||'']
         );
-        await logActivity('inventory', 'add', 'Adicionado: ' + nome, pool);
-        const [newItem] = await pool.execute('SELECT * FROM estoque_itens WHERE id = ?', [result.insertId]);
-        res.status(201).json(newItem[0]);
-    } catch (err) {
-        console.error('Erro ao adicionar item:', err);
-        res.status(500).json({ error: 'Erro ao adicionar item' });
-    }
+        await logActivity('inventory','add','Adicionado: '+nome, getUserNome(req), getUserId(req), null);
+        const [item] = await pool.execute('SELECT * FROM estoque_itens WHERE id=?',[result.insertId]);
+        res.status(201).json(item[0]);
+    } catch (err) { res.status(500).json({ error: 'Erro ao adicionar item' }); }
 });
 
 app.put('/api/estoque/:id', requireAuth, async (req, res) => {
@@ -197,62 +215,43 @@ app.put('/api/estoque/:id', requireAuth, async (req, res) => {
     const { nome, categoria, quantidade, estoque_minimo, localizacao, descricao } = req.body;
     try {
         await pool.execute(
-            'UPDATE estoque_itens SET nome=?, categoria=?, quantidade=?, estoque_minimo=?, localizacao=?, descricao=? WHERE id=? AND ativo=1',
-            [nome, categoria, quantidade, estoque_minimo, localizacao || '', descricao || '', id]
+            'UPDATE estoque_itens SET nome=?,categoria=?,quantidade=?,estoque_minimo=?,localizacao=?,descricao=? WHERE id=? AND ativo=1',
+            [nome, categoria, quantidade, estoque_minimo, localizacao||'', descricao||'', id]
         );
-        await logActivity('inventory', 'edit', 'Editado: ' + nome, pool);
-        const [updated] = await pool.execute('SELECT * FROM estoque_itens WHERE id = ?', [id]);
+        await logActivity('inventory','edit','Editado: '+nome, getUserNome(req), getUserId(req), null);
+        const [updated] = await pool.execute('SELECT * FROM estoque_itens WHERE id=?',[id]);
         res.json(updated[0]);
-    } catch (err) {
-        console.error('Erro ao editar item:', err);
-        res.status(500).json({ error: 'Erro ao editar item' });
-    }
+    } catch (err) { res.status(500).json({ error: 'Erro ao editar item' }); }
 });
 
 app.delete('/api/estoque/:id', requireAuth, async (req, res) => {
     const { id } = req.params;
     try {
-        const [item] = await pool.execute('SELECT nome FROM estoque_itens WHERE id = ?', [id]);
-        await pool.execute('UPDATE estoque_itens SET ativo = 0 WHERE id = ?', [id]);
-        if (item[0]) await logActivity('inventory', 'delete', 'Excluído: ' + item[0].nome, pool);
+        const [item] = await pool.execute('SELECT nome FROM estoque_itens WHERE id=?',[id]);
+        await pool.execute('UPDATE estoque_itens SET ativo=0 WHERE id=?',[id]);
+        if (item[0]) await logActivity('inventory','delete','Excluído: '+item[0].nome, getUserNome(req), getUserId(req), null);
         res.json({ success: true });
-    } catch (err) {
-        console.error('Erro ao excluir item:', err);
-        res.status(500).json({ error: 'Erro ao excluir item' });
-    }
+    } catch (err) { res.status(500).json({ error: 'Erro ao excluir item' }); }
 });
 
-// ==========================================
-// ROTAS DE SNIPPETS
-// ==========================================
 app.get('/api/snippets', requireAuth, async (req, res) => {
     try {
-        const [rows] = await pool.execute(
-            'SELECT * FROM snippets WHERE ativo = 1 ORDER BY data_criacao DESC'
-        );
+        const [rows] = await pool.execute('SELECT * FROM snippets WHERE ativo=1 ORDER BY data_criacao DESC');
         res.json(rows);
-    } catch (err) {
-        console.error('Erro ao listar snippets:', err);
-        res.status(500).json({ error: 'Erro ao listar snippets' });
-    }
+    } catch (err) { res.status(500).json({ error: 'Erro ao listar snippets' }); }
 });
 
 app.post('/api/snippets', requireAuth, async (req, res) => {
     const { titulo, categoria, tipo, tags, descricao, codigo } = req.body;
-    if (!titulo || !categoria || !tipo || !codigo) {
-        return res.status(400).json({ error: 'Campos obrigatórios faltando' });
-    }
+    if (!titulo||!categoria||!tipo||!codigo) return res.status(400).json({ error: 'Campos obrigatórios faltando' });
     try {
         const [result] = await pool.execute(
-            'INSERT INTO snippets (titulo, categoria, tipo, tags, descricao, codigo) VALUES (?, ?, ?, ?, ?, ?)',
-            [titulo, categoria, tipo, tags || '', descricao || '', codigo]
+            'INSERT INTO snippets (titulo,categoria,tipo,tags,descricao,codigo) VALUES (?,?,?,?,?,?)',
+            [titulo, categoria, tipo, tags||'', descricao||'', codigo]
         );
-        const [newSnippet] = await pool.execute('SELECT * FROM snippets WHERE id = ?', [result.insertId]);
-        res.status(201).json(newSnippet[0]);
-    } catch (err) {
-        console.error('Erro ao adicionar snippet:', err);
-        res.status(500).json({ error: 'Erro ao adicionar snippet' });
-    }
+        const [s] = await pool.execute('SELECT * FROM snippets WHERE id=?',[result.insertId]);
+        res.status(201).json(s[0]);
+    } catch (err) { res.status(500).json({ error: 'Erro ao adicionar snippet' }); }
 });
 
 app.put('/api/snippets/:id', requireAuth, async (req, res) => {
@@ -260,58 +259,52 @@ app.put('/api/snippets/:id', requireAuth, async (req, res) => {
     const { titulo, categoria, tipo, tags, descricao, codigo } = req.body;
     try {
         await pool.execute(
-            'UPDATE snippets SET titulo=?, categoria=?, tipo=?, tags=?, descricao=?, codigo=? WHERE id=? AND ativo=1',
-            [titulo, categoria, tipo, tags || '', descricao || '', codigo, id]
+            'UPDATE snippets SET titulo=?,categoria=?,tipo=?,tags=?,descricao=?,codigo=? WHERE id=? AND ativo=1',
+            [titulo, categoria, tipo, tags||'', descricao||'', codigo, id]
         );
-        const [updated] = await pool.execute('SELECT * FROM snippets WHERE id = ?', [id]);
-        res.json(updated[0]);
-    } catch (err) {
-        console.error('Erro ao editar snippet:', err);
-        res.status(500).json({ error: 'Erro ao editar snippet' });
-    }
+        const [u] = await pool.execute('SELECT * FROM snippets WHERE id=?',[id]);
+        res.json(u[0]);
+    } catch (err) { res.status(500).json({ error: 'Erro ao editar snippet' }); }
 });
 
 app.delete('/api/snippets/:id', requireAuth, async (req, res) => {
     const { id } = req.params;
     try {
-        await pool.execute('UPDATE snippets SET ativo = 0 WHERE id = ?', [id]);
+        await pool.execute('UPDATE snippets SET ativo=0 WHERE id=?',[id]);
         res.json({ success: true });
-    } catch (err) {
-        console.error('Erro ao excluir snippet:', err);
-        res.status(500).json({ error: 'Erro ao excluir snippet' });
-    }
+    } catch (err) { res.status(500).json({ error: 'Erro ao excluir snippet' }); }
 });
 
-// ==========================================
-// ROTAS DE SERVIÇOS
-// ==========================================
 app.get('/api/servicos', requireAuth, async (req, res) => {
     try {
-        const [rows] = await pool.execute(
-            'SELECT * FROM servicos ORDER BY data_criacao DESC'
-        );
+        const [rows] = await pool.execute('SELECT * FROM servicos ORDER BY data_criacao DESC');
         res.json(rows);
-    } catch (err) {
-        console.error('Erro ao listar serviços:', err);
-        res.status(500).json({ error: 'Erro ao listar serviços' });
-    }
+    } catch (err) { res.status(500).json({ error: 'Erro ao listar serviços' }); }
 });
 
 app.post('/api/servicos', requireAuth, async (req, res) => {
     const { titulo, cliente_setor, prioridade, data_servico, descricao, relatorio } = req.body;
-    if (!titulo || !descricao) {
-        return res.status(400).json({ error: 'Título e descrição são obrigatórios' });
-    }
+    if (!titulo||!descricao) return res.status(400).json({ error: 'Título e descrição são obrigatórios' });
+    const nomeUsr = getUserNome(req);
+    const idUsr   = getUserId(req);
     try {
-        const [result] = await pool.execute(
-            'INSERT INTO servicos (titulo, cliente_setor, prioridade, data_servico, descricao, relatorio, status) VALUES (?, ?, ?, ?, ?, ?, ?)',
-            [titulo, cliente_setor || '', prioridade || 'media', data_servico || null, descricao, relatorio || '', 'pending']
-        );
-        await logActivity('services', 'add', 'Adicionado serviço: ' + titulo, pool);
-        const [newService] = await pool.execute('SELECT * FROM servicos WHERE id = ?', [result.insertId]);
-        res.status(201).json(newService[0]);
+        let result;
+        try {
+            [result] = await pool.execute(
+                'INSERT INTO servicos (titulo,cliente_setor,prioridade,data_servico,descricao,relatorio,status,criado_por,usuario_id) VALUES (?,?,?,?,?,?,?,?,?)',
+                [titulo, cliente_setor||'', prioridade||'media', data_servico||null, descricao, relatorio||'', 'pending', nomeUsr, idUsr]
+            );
+        } catch (e2) {
+            [result] = await pool.execute(
+                'INSERT INTO servicos (titulo,cliente_setor,prioridade,data_servico,descricao,relatorio,status) VALUES (?,?,?,?,?,?,?)',
+                [titulo, cliente_setor||'', prioridade||'media', data_servico||null, descricao, relatorio||'', 'pending']
+            );
+        }
+        await logActivity('services','add','Adicionado serviço: '+titulo, nomeUsr, idUsr, null);
+        const [s] = await pool.execute('SELECT * FROM servicos WHERE id=?',[result.insertId]);
+        res.status(201).json(s[0]);
     } catch (err) {
-        console.error('Erro ao adicionar serviço:', err);
+        console.error('Serviços POST error:', err);
         res.status(500).json({ error: 'Erro ao adicionar serviço' });
     }
 });
@@ -319,61 +312,96 @@ app.post('/api/servicos', requireAuth, async (req, res) => {
 app.put('/api/servicos/:id', requireAuth, async (req, res) => {
     const { id } = req.params;
     const { titulo, cliente_setor, prioridade, data_servico, descricao, relatorio } = req.body;
+    const nomeUsr = getUserNome(req);
+    const idUsr   = getUserId(req);
     try {
-        await pool.execute(
-            'UPDATE servicos SET titulo=?, cliente_setor=?, prioridade=?, data_servico=?, descricao=?, relatorio=? WHERE id=?',
-            [titulo, cliente_setor || '', prioridade || 'media', data_servico || null, descricao, relatorio || '', id]
-        );
-        await logActivity('services', 'edit', 'Editado serviço: ' + titulo, pool);
-        const [updated] = await pool.execute('SELECT * FROM servicos WHERE id = ?', [id]);
-        res.json(updated[0]);
-    } catch (err) {
-        console.error('Erro ao editar serviço:', err);
-        res.status(500).json({ error: 'Erro ao editar serviço' });
-    }
+        let dono = {};
+        try {
+            const [existing] = await pool.execute('SELECT criado_por,usuario_id FROM servicos WHERE id=?',[id]);
+            if (!existing.length) return res.status(404).json({ error: 'Serviço não encontrado' });
+            dono = existing[0];
+        } catch (e2) {
+            const [existing] = await pool.execute('SELECT id FROM servicos WHERE id=?',[id]);
+            if (!existing.length) return res.status(404).json({ error: 'Serviço não encontrado' });
+        }
+        if (dono.usuario_id && dono.usuario_id !== idUsr)
+            return res.status(403).json({ error: 'Apenas o responsável pode editar este serviço.' });
+        try {
+            await pool.execute(
+                'UPDATE servicos SET titulo=?,cliente_setor=?,prioridade=?,data_servico=?,descricao=?,relatorio=?,modificado_por=? WHERE id=?',
+                [titulo, cliente_setor||'', prioridade||'media', data_servico||null, descricao, relatorio||'', nomeUsr, id]
+            );
+        } catch (e2) {
+            await pool.execute(
+                'UPDATE servicos SET titulo=?,cliente_setor=?,prioridade=?,data_servico=?,descricao=?,relatorio=? WHERE id=?',
+                [titulo, cliente_setor||'', prioridade||'media', data_servico||null, descricao, relatorio||'', id]
+            );
+        }
+        await logActivity('services','edit','Editado serviço: '+titulo, nomeUsr, idUsr, null);
+        const [u] = await pool.execute('SELECT * FROM servicos WHERE id=?',[id]);
+        res.json(u[0]);
+    } catch (err) { res.status(500).json({ error: 'Erro ao editar serviço' }); }
 });
 
 app.patch('/api/servicos/:id/concluir', requireAuth, async (req, res) => {
     const { id } = req.params;
+    const nomeUsr = getUserNome(req);
+    const idUsr   = getUserId(req);
     try {
-        await pool.execute(
-            'UPDATE servicos SET status = ?, data_conclusao = NOW() WHERE id = ?',
-            ['completed', id]
-        );
-        const [service] = await pool.execute('SELECT titulo FROM servicos WHERE id = ?', [id]);
-        if (service[0]) await logActivity('services', 'complete', 'Concluído: ' + service[0].titulo, pool);
+        let dono = {}; let titulo = '';
+        try {
+            const [existing] = await pool.execute('SELECT criado_por,usuario_id,titulo FROM servicos WHERE id=?',[id]);
+            if (!existing.length) return res.status(404).json({ error: 'Serviço não encontrado' });
+            dono = existing[0]; titulo = existing[0].titulo;
+        } catch (e2) {
+            const [existing] = await pool.execute('SELECT titulo FROM servicos WHERE id=?',[id]);
+            if (!existing.length) return res.status(404).json({ error: 'Serviço não encontrado' });
+            titulo = existing[0].titulo;
+        }
+        if (dono.usuario_id && dono.usuario_id !== idUsr)
+            return res.status(403).json({ error: 'Apenas o responsável pode concluir este serviço.' });
+        try {
+            await pool.execute('UPDATE servicos SET status=?,data_conclusao=NOW(),modificado_por=? WHERE id=?',['completed', nomeUsr, id]);
+        } catch (e2) {
+            await pool.execute('UPDATE servicos SET status=?,data_conclusao=NOW() WHERE id=?',['completed', id]);
+        }
+        await logActivity('services','complete','Concluído: '+titulo, nomeUsr, idUsr, null);
         res.json({ success: true });
-    } catch (err) {
-        console.error('Erro ao concluir serviço:', err);
-        res.status(500).json({ error: 'Erro ao concluir serviço' });
-    }
+    } catch (err) { res.status(500).json({ error: 'Erro ao concluir serviço' }); }
 });
 
 app.delete('/api/servicos/:id', requireAuth, async (req, res) => {
     const { id } = req.params;
+    const nomeUsr = getUserNome(req);
+    const idUsr   = getUserId(req);
     try {
-        const [service] = await pool.execute('SELECT titulo FROM servicos WHERE id = ?', [id]);
-        await pool.execute('DELETE FROM servicos WHERE id = ?', [id]);
-        if (service[0]) await logActivity('services', 'delete', 'Excluído: ' + service[0].titulo, pool);
+        const [rows] = await pool.execute('SELECT * FROM servicos WHERE id=?',[id]);
+        if (!rows.length) return res.status(404).json({ error: 'Serviço não encontrado' });
+        const svc = rows[0];
+        if (svc.usuario_id && svc.usuario_id !== idUsr)
+            return res.status(403).json({ error: 'Apenas o responsável pode excluir este serviço.' });
+        const snapshot = {
+            titulo: svc.titulo, cliente_setor: svc.cliente_setor,
+            prioridade: svc.prioridade, status: svc.status,
+            descricao: svc.descricao, relatorio: svc.relatorio,
+            criado_por: svc.criado_por || nomeUsr, data_servico: svc.data_servico
+        };
+        await pool.execute('DELETE FROM servicos WHERE id=?',[id]);
+        await logActivity('services','delete','Excluído: '+svc.titulo, nomeUsr, idUsr, snapshot);
         res.json({ success: true });
     } catch (err) {
-        console.error('Erro ao excluir serviço:', err);
+        console.error('Serviços DELETE error:', err);
         res.status(500).json({ error: 'Erro ao excluir serviço' });
     }
 });
 
-// ==========================================
-// ROTAS DE CONFIGURAÇÕES
-// ==========================================
 app.get('/api/configuracoes', requireAuth, async (req, res) => {
     try {
         const [rows] = await pool.execute('SELECT * FROM configuracoes');
         const config = {};
-        rows.forEach(row => { config[row.chave] = row.valor; });
+        rows.forEach(r => { config[r.chave] = r.valor; });
         res.json(config);
-    } catch (err) {
-        res.status(500).json({ error: 'Erro ao carregar configurações' });
-    }
+    } catch (err) { res.status(500).json({ error: 'Erro ao carregar configurações' }); }
 });
 
 app.put('/api/configuracoes/:chave', requireAuth, async (req, res) => {
@@ -381,20 +409,34 @@ app.put('/api/configuracoes/:chave', requireAuth, async (req, res) => {
     const { valor } = req.body;
     try {
         await pool.execute(
-            'INSERT INTO configuracoes (chave, valor) VALUES (?, ?) ON DUPLICATE KEY UPDATE valor = ?',
+            'INSERT INTO configuracoes (chave,valor) VALUES (?,?) ON DUPLICATE KEY UPDATE valor=?',
             [chave, valor, valor]
         );
         res.json({ success: true });
-    } catch (err) {
-        res.status(500).json({ error: 'Erro ao salvar configuração' });
-    }
+    } catch (err) { res.status(500).json({ error: 'Erro ao salvar configuração' }); }
 });
 
+async function logActivity(tipo, acao, detalhes, usuarioNome, usuarioId, snapshot) {
+    try {
+        try {
+            await pool.execute(
+                'INSERT INTO atividades (tipo,acao,detalhes,usuario_nome,usuario_id,snapshot) VALUES (?,?,?,?,?,?)',
+                [tipo, acao, detalhes, usuarioNome||null, usuarioId||null, snapshot ? JSON.stringify(snapshot) : null]
+            );
+        } catch (e2) {
+            await pool.execute(
+                'INSERT INTO atividades (tipo,acao,detalhes) VALUES (?,?,?)',
+                [tipo, acao, detalhes]
+            );
+        }
+    } catch (err) { console.error('Erro ao registrar atividade:', err); }
+}
+
 // ==========================================
-// ROTAS DE SOLICITAÇÕES (Sistema Interno)
+// ROTAS DE SOLICITAÇÕES
 // ==========================================
 
-// Próximo número S.O. — sem auth (usado pelo portal público também)
+// Próximo número S.O. — sem auth (usado pelo portal público)
 app.get('/api/solicitacoes/proximo-numero', async (req, res) => {
     try {
         const ano = new Date().getFullYear();
@@ -409,7 +451,7 @@ app.get('/api/solicitacoes/proximo-numero', async (req, res) => {
         }
         res.json({ numero: String(proximo).padStart(6, '0') + '/' + ano });
     } catch (err) {
-        console.error('Erro ao gerar número SO:', err);
+        console.error('Erro ao gerar número SO:', err.message);
         res.status(500).json({ error: 'Erro ao gerar número' });
     }
 });
@@ -417,25 +459,20 @@ app.get('/api/solicitacoes/proximo-numero', async (req, res) => {
 // Criar solicitação — sem auth (recebida do portal público)
 app.post('/api/solicitacoes', async (req, res) => {
     const { numero_so, titulo, cliente_setor, descricao, data_solicitacao } = req.body;
-    if (!titulo || !descricao || !numero_so) {
+    if (!titulo || !descricao || !numero_so)
         return res.status(400).json({ error: 'Campos obrigatórios faltando' });
-    }
     try {
-        const [existe] = await pool.execute(
-            'SELECT id FROM solicitacoes WHERE numero_so = ?', [numero_so]
-        );
-        if (existe.length > 0) {
+        const [existe] = await pool.execute('SELECT id FROM solicitacoes WHERE numero_so=?', [numero_so]);
+        if (existe.length > 0)
             return res.status(409).json({ error: 'Número S.O. já utilizado. Tente novamente.' });
-        }
         await pool.execute(
-            `INSERT INTO solicitacoes (numero_so, titulo, cliente_setor, descricao, data_solicitacao, status)
-             VALUES (?, ?, ?, ?, ?, 'nova')`,
-            [numero_so, titulo, cliente_setor || '', descricao, data_solicitacao || null]
+            `INSERT INTO solicitacoes (numero_so,titulo,cliente_setor,descricao,data_solicitacao,status) VALUES (?,?,?,?,?,'nova')`,
+            [numero_so, titulo, cliente_setor||'', descricao, data_solicitacao||null]
         );
         res.status(201).json({ success: true, numero_so });
     } catch (err) {
-        console.error('Erro ao criar solicitação:', err);
-        res.status(500).json({ error: 'Erro ao registrar solicitação' });
+        console.error('Erro ao criar solicitação:', err.message);
+        res.status(500).json({ error: 'Erro ao registrar solicitação', detail: err.message });
     }
 });
 
@@ -446,44 +483,49 @@ app.get('/api/solicitacoes', requireAuth, async (req, res) => {
             `SELECT * FROM solicitacoes WHERE status != 'excluido' ORDER BY data_criacao DESC`
         );
         res.json(rows);
-    } catch (err) {
-        console.error('Erro ao listar solicitações:', err);
-        res.status(500).json({ error: 'Erro ao listar solicitações' });
-    }
+    } catch (err) { res.status(500).json({ error: 'Erro ao listar solicitações' }); }
 });
 
 // Salvar solicitação como serviço — requer auth
 app.post('/api/solicitacoes/:id/salvar-servico', requireAuth, async (req, res) => {
     const { id } = req.params;
     const { prioridade } = req.body;
-    if (!prioridade) {
-        return res.status(400).json({ error: 'Prioridade é obrigatória' });
-    }
+    const nomeUsr = getUserNome(req);
+    const idUsr   = getUserId(req);
+    if (!prioridade) return res.status(400).json({ error: 'Prioridade é obrigatória' });
     try {
         const [rows] = await pool.execute(
-            "SELECT * FROM solicitacoes WHERE id = ? AND status = 'nova'", [id]
+            "SELECT * FROM solicitacoes WHERE id=? AND status='nova'", [id]
         );
-        if (rows.length === 0) {
+        if (!rows.length)
             return res.status(404).json({ error: 'Solicitação não encontrada ou já processada' });
-        }
         const sol = rows[0];
-        const [result] = await pool.execute(
-            `INSERT INTO servicos (titulo, cliente_setor, prioridade, data_servico, descricao, relatorio, status)
-             VALUES (?, ?, ?, ?, ?, '', 'pending')`,
-            [sol.titulo, sol.cliente_setor, prioridade, sol.data_solicitacao,
-             `[S.O. ${sol.numero_so}] ${sol.descricao}`]
-        );
-        const servicoId = result.insertId;
+        let result;
+        try {
+            [result] = await pool.execute(
+                `INSERT INTO servicos (titulo,cliente_setor,prioridade,data_servico,descricao,relatorio,status,criado_por,usuario_id)
+                 VALUES (?,?,?,?,?,'','pending',?,?)`,
+                [sol.titulo, sol.cliente_setor, prioridade, sol.data_solicitacao,
+                 `[S.O. ${sol.numero_so}] ${sol.descricao}`, nomeUsr, idUsr]
+            );
+        } catch(e2) {
+            [result] = await pool.execute(
+                `INSERT INTO servicos (titulo,cliente_setor,prioridade,data_servico,descricao,relatorio,status)
+                 VALUES (?,?,?,?,?,'','pending')`,
+                [sol.titulo, sol.cliente_setor, prioridade, sol.data_solicitacao,
+                 `[S.O. ${sol.numero_so}] ${sol.descricao}`]
+            );
+        }
         await pool.execute(
-            `UPDATE solicitacoes SET status = 'salvo', prioridade = ?, servico_id = ? WHERE id = ?`,
-            [prioridade, servicoId, id]
+            `UPDATE solicitacoes SET status='salvo', prioridade=?, servico_id=? WHERE id=?`,
+            [prioridade, result.insertId, id]
         );
         await logActivity('services', 'add',
-            `Serviço criado via S.O. ${sol.numero_so}: ${sol.titulo}`, pool);
-        res.json({ success: true, servico_id: servicoId });
+            `Serviço criado via S.O. ${sol.numero_so}: ${sol.titulo}`, nomeUsr, idUsr, null);
+        res.json({ success: true, servico_id: result.insertId });
     } catch (err) {
-        console.error('Erro ao salvar serviço:', err);
-        res.status(500).json({ error: 'Erro ao salvar como serviço' });
+        console.error('Erro ao salvar serviço:', err.message);
+        res.status(500).json({ error: 'Erro ao salvar como serviço', detail: err.message });
     }
 });
 
@@ -491,55 +533,35 @@ app.post('/api/solicitacoes/:id/salvar-servico', requireAuth, async (req, res) =
 app.delete('/api/solicitacoes/:id', requireAuth, async (req, res) => {
     const { id } = req.params;
     try {
-        await pool.execute(
-            "UPDATE solicitacoes SET status = 'excluido' WHERE id = ?", [id]
-        );
+        await pool.execute("UPDATE solicitacoes SET status='excluido' WHERE id=?", [id]);
         res.json({ success: true });
-    } catch (err) {
-        console.error('Erro ao excluir solicitação:', err);
-        res.status(500).json({ error: 'Erro ao excluir solicitação' });
-    }
+    } catch (err) { res.status(500).json({ error: 'Erro ao excluir solicitação' }); }
 });
 
 // ==========================================
-// HELPER: REGISTRAR ATIVIDADE
+// MIGRAÇÃO DA TABELA SOLICITACOES
+// Já inclusa no runMigrations() abaixo
 // ==========================================
-async function logActivity(tipo, acao, detalhes, pool) {
-    try {
-        await pool.execute(
-            'INSERT INTO atividades (tipo, acao, detalhes) VALUES (?, ?, ?)',
-            [tipo, acao, detalhes]
-        );
-    } catch (err) {
-        console.error('Erro ao registrar atividade:', err);
-    }
-}
 
-// ==========================================
-// ARQUIVOS ESTÁTICOS + FALLBACK PARA SPA
-// Declarados APÓS todas as rotas /api/* para não interceptá-las
-// ==========================================
 app.use(express.static(path.join(__dirname)));
+app.get('*', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
 
-app.get('*', (req, res) => {
-    res.sendFile(path.join(__dirname, 'index.html'));
-});
-
-// ==========================================
-// INICIAR SERVIDOR
-// Railway exige bind em 0.0.0.0 e usa PORT dinamicamente
-// ==========================================
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, '0.0.0.0', async () => {
-    console.log(`🚀 Setor de TI rodando na porta ${PORT}`);
+
+// Migrate FIRST, then start server — ensures columns exist before any request
+async function startServer() {
     try {
         const conn = await pool.getConnection();
-        console.log('✅ Conectado ao banco de dados MySQL (Railway)');
+        console.log('Conectado ao MySQL (Railway)');
         conn.release();
-        // Cria tabelas que ainda não existem
         await runMigrations();
     } catch (err) {
-        console.error('⚠️  Banco de dados indisponível no momento:', err.message);
-        console.error('   O servidor HTTP continua rodando. Verifique as variáveis de ambiente.');
+        console.error('Banco indisponível no boot:', err.message);
+        // Start anyway — health check must respond
     }
-});
+    app.listen(PORT, '0.0.0.0', () => {
+        console.log('Setor de TI rodando na porta ' + PORT);
+    });
+}
+
+startServer();
