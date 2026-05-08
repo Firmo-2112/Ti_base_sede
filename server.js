@@ -59,6 +59,8 @@ async function runMigrations() {
             CREATE TABLE IF NOT EXISTS solicitacoes (
                 id               INT NOT NULL AUTO_INCREMENT,
                 numero_so        VARCHAR(20)  NOT NULL,
+                criado_por       VARCHAR(100) DEFAULT NULL,
+                excluido_por     VARCHAR(100) DEFAULT NULL,
                 titulo           VARCHAR(100) NOT NULL,
                 cliente_setor    VARCHAR(100) DEFAULT NULL,
                 descricao        TEXT         NOT NULL,
@@ -76,6 +78,14 @@ async function runMigrations() {
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
         `);
         console.log('  + Tabela solicitacoes OK');
+        // Add new columns if upgrading existing table
+        for (const col of ['criado_por VARCHAR(100) DEFAULT NULL', 'excluido_por VARCHAR(100) DEFAULT NULL']) {
+            const colName = col.split(' ')[0];
+            try {
+                const ex = await columnExists('solicitacoes', colName);
+                if (!ex) await pool.execute('ALTER TABLE solicitacoes ADD COLUMN ' + col);
+            } catch(e2) {}
+        }
     } catch(e) { console.error('  ! Tabela solicitacoes:', e.message); }
 
     // Atualizar view com coluna solicitacoes_novas
@@ -436,7 +446,7 @@ async function logActivity(tipo, acao, detalhes, usuarioNome, usuarioId, snapsho
 // ROTAS DE SOLICITAÇÕES
 // ==========================================
 
-// Próximo número S.O. — sem auth (usado pelo portal público)
+// Próximo número O.S. — sem auth (usado pelo portal público)
 app.get('/api/solicitacoes/proximo-numero', async (req, res) => {
     try {
         const ano = new Date().getFullYear();
@@ -464,11 +474,13 @@ app.post('/api/solicitacoes', async (req, res) => {
     try {
         const [existe] = await pool.execute('SELECT id FROM solicitacoes WHERE numero_so=?', [numero_so]);
         if (existe.length > 0)
-            return res.status(409).json({ error: 'Número S.O. já utilizado. Tente novamente.' });
+            return res.status(409).json({ error: 'Número O.S. já utilizado. Tente novamente.' });
         await pool.execute(
             `INSERT INTO solicitacoes (numero_so,titulo,cliente_setor,descricao,data_solicitacao,status) VALUES (?,?,?,?,?,'nova')`,
             [numero_so, titulo, cliente_setor||'', descricao, data_solicitacao||null]
         );
+        // Log activity — usuario info not available on public POST, leave null
+        await logActivity('services', 'add', 'O.S. criada: ' + numero_so + ' — ' + titulo, null, null, null);
         res.status(201).json({ success: true, numero_so });
     } catch (err) {
         console.error('Erro ao criar solicitação:', err.message);
@@ -506,14 +518,14 @@ app.post('/api/solicitacoes/:id/salvar-servico', requireAuth, async (req, res) =
                 `INSERT INTO servicos (titulo,cliente_setor,prioridade,data_servico,descricao,relatorio,status,criado_por,usuario_id)
                  VALUES (?,?,?,?,?,'','pending',?,?)`,
                 [sol.titulo, sol.cliente_setor, prioridade, sol.data_solicitacao,
-                 `[S.O. ${sol.numero_so}] ${sol.descricao}`, nomeUsr, idUsr]
+                 `[O.S. ${sol.numero_so}] ${sol.descricao}`, nomeUsr, idUsr]
             );
         } catch(e2) {
             [result] = await pool.execute(
                 `INSERT INTO servicos (titulo,cliente_setor,prioridade,data_servico,descricao,relatorio,status)
                  VALUES (?,?,?,?,?,'','pending')`,
                 [sol.titulo, sol.cliente_setor, prioridade, sol.data_solicitacao,
-                 `[S.O. ${sol.numero_so}] ${sol.descricao}`]
+                 `[O.S. ${sol.numero_so}] ${sol.descricao}`]
             );
         }
         await pool.execute(
@@ -521,7 +533,7 @@ app.post('/api/solicitacoes/:id/salvar-servico', requireAuth, async (req, res) =
             [prioridade, result.insertId, id]
         );
         await logActivity('services', 'add',
-            `Serviço criado via S.O. ${sol.numero_so}: ${sol.titulo}`, nomeUsr, idUsr, null);
+            `Serviço criado via O.S. ${sol.numero_so}: ${sol.titulo}`, nomeUsr, idUsr, null);
         res.json({ success: true, servico_id: result.insertId });
     } catch (err) {
         console.error('Erro ao salvar serviço:', err.message);
@@ -532,8 +544,16 @@ app.post('/api/solicitacoes/:id/salvar-servico', requireAuth, async (req, res) =
 // Excluir solicitação (soft delete) — requer auth
 app.delete('/api/solicitacoes/:id', requireAuth, async (req, res) => {
     const { id } = req.params;
+    const nomeUsr = getUserNome(req);
+    const idUsr   = getUserId(req);
     try {
-        await pool.execute("UPDATE solicitacoes SET status='excluido' WHERE id=?", [id]);
+        const [rows] = await pool.execute('SELECT numero_so, titulo FROM solicitacoes WHERE id=?', [id]);
+        await pool.execute("UPDATE solicitacoes SET status='excluido', excluido_por=? WHERE id=?", [nomeUsr, id]);
+        if (rows[0]) {
+            await logActivity('services', 'delete',
+                'O.S. excluída: ' + rows[0].numero_so + ' — ' + rows[0].titulo,
+                nomeUsr, idUsr, null);
+        }
         res.json({ success: true });
     } catch (err) { res.status(500).json({ error: 'Erro ao excluir solicitação' }); }
 });
