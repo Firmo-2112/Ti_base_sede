@@ -2736,3 +2736,73 @@ html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
     .sol-card-actions { justify-content: flex-end; }
     .sol-priority-select { flex-direction: column; align-items: flex-start; }
 }
+
+/* ==========================================
+   RELATÓRIOS SALVOS
+   ========================================== */
+
+.salvos-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.625rem;
+    min-height: 120px;
+}
+
+.salvos-item {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    padding: 0.875rem 1rem;
+    transition: all var(--t-normal);
+}
+
+.salvos-item:hover {
+    border-color: var(--border-bright);
+    transform: translateX(2px);
+}
+
+.salvos-icon {
+    width: 36px;
+    height: 36px;
+    background: var(--primary-dim);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--primary);
+    flex-shrink: 0;
+}
+
+.salvos-info {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+}
+
+.salvos-titulo {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--text-bright);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.salvos-meta {
+    font-size: 0.6875rem;
+    color: var(--text-muted);
+    letter-spacing: 0.03em;
+}
+
+.salvos-actions {
+    display: flex;
+    gap: 0.375rem;
+    align-items: center;
+    flex-shrink: 0;
+}
