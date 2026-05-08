@@ -1115,6 +1115,7 @@ const Reports = {
         this._bindEstoque();
         this._bindServicos();
         this._bindPedido();
+        this._bindSalvos();
     },
 
     _bindSubtabs() {
@@ -1124,6 +1125,7 @@ const Reports = {
                 document.querySelectorAll('.report-panel').forEach(p => p.classList.remove('active'));
                 btn.classList.add('active');
                 document.getElementById('report-panel-' + btn.dataset.report).classList.add('active');
+                if (btn.dataset.report === 'salvos') this.renderSalvos();
             };
         });
     },
@@ -1136,6 +1138,8 @@ const Reports = {
     _bindServicos() {
         const btn = document.getElementById('btnGerarServicos');
         if (btn) btn.onclick = () => this.gerarServicos();
+        const btnFolha = document.getElementById('btnFolhaEmBranco');
+        if (btnFolha) btnFolha.onclick = () => this.gerarFolhaEmBranco();
     },
 
     _bindPedido() {
@@ -1143,9 +1147,86 @@ const Reports = {
         const btnGerar = document.getElementById('btnGerarPedido');
         if (btnAdd)   btnAdd.onclick   = () => this.adicionarItemPedido();
         if (btnGerar) btnGerar.onclick = () => this.gerarPedido();
-        // Enter key on nome field adds item
         const nomeEl = document.getElementById('pedidoNome');
         if (nomeEl) nomeEl.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); this.adicionarItemPedido(); } });
+    },
+
+    _bindSalvos() {
+        const btnLimpar = document.getElementById('btnLimparSalvos');
+        if (btnLimpar) btnLimpar.onclick = () => {
+            Modal.confirm('Limpar Histórico', 'Deseja remover todos os relatórios salvos?', () => {
+                this.savedReports = [];
+                this._persistSalvos();
+                this.renderSalvos();
+                Toast.show('Histórico limpo!', 'info');
+            });
+        };
+    },
+
+    // ── RELATÓRIOS SALVOS ──
+    savedReports: JSON.parse(localStorage.getItem('setor_ti_salvos') || '[]'),
+
+    _persistSalvos() {
+        try { localStorage.setItem('setor_ti_salvos', JSON.stringify(this.savedReports)); } catch(e) {}
+    },
+
+    _salvarRelatorio(tipo, titulo, html) {
+        const entry = {
+            id:      Date.now(),
+            tipo,
+            titulo,
+            data:    new Date().toLocaleDateString('pt-BR'),
+            hora:    new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+            usuario: AppState.currentUser ? (AppState.currentUser.nome || AppState.currentUser.usuario) : '',
+            html
+        };
+        this.savedReports.unshift(entry);
+        if (this.savedReports.length > 50) this.savedReports = this.savedReports.slice(0, 50);
+        this._persistSalvos();
+    },
+
+    renderSalvos() {
+        const container = document.getElementById('salvosListContainer');
+        if (!container) return;
+        if (this.savedReports.length === 0) {
+            container.innerHTML = '<div class="report-preview-empty"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="48" height="48"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg><p>Nenhum relatório salvo ainda</p></div>';
+            return;
+        }
+        const tipoIcons = {
+            estoque:  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>',
+            servicos: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>',
+            pedido:   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/></svg>',
+        };
+        container.innerHTML = this.savedReports.map(r => `
+            <div class="salvos-item">
+                <div class="salvos-icon">${tipoIcons[r.tipo] || tipoIcons.servicos}</div>
+                <div class="salvos-info">
+                    <span class="salvos-titulo">${Inventory.escapeHtml(r.titulo)}</span>
+                    <span class="salvos-meta">${r.data} às ${r.hora}${r.usuario ? ' · ' + Inventory.escapeHtml(r.usuario) : ''}</span>
+                </div>
+                <div class="salvos-actions">
+                    <button class="btn btn-sm btn-primary" onclick="Reports.reabrirRelatorio(${r.id})">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                        Abrir
+                    </button>
+                    <button class="btn btn-sm btn-danger btn-icon" onclick="Reports.excluirSalvo(${r.id})" title="Remover">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/></svg>
+                    </button>
+                </div>
+            </div>
+        `).join('');
+    },
+
+    reabrirRelatorio(id) {
+        const r = this.savedReports.find(x => x.id === id);
+        if (!r) return;
+        this._printHtml(r.html, r.titulo.replace(/\s+/g, '_'));
+    },
+
+    excluirSalvo(id) {
+        this.savedReports = this.savedReports.filter(x => x.id !== id);
+        this._persistSalvos();
+        this.renderSalvos();
     },
 
     adicionarItemPedido() {
@@ -1317,6 +1398,7 @@ const Reports = {
             </body></html>`;
 
             this._printHtml(html, 'Relatorio_Estoque');
+            this._salvarRelatorio('estoque', 'Relatório de Estoque — ' + today, html);
         } catch(e) {
             Toast.show('Erro ao gerar relatório!', 'error');
         }
@@ -1367,6 +1449,7 @@ const Reports = {
             </body></html>`;
 
             this._printHtml(html, 'Relatorio_Servicos');
+            this._salvarRelatorio('servicos', 'Relatório de Serviços — ' + today, html);
         } catch(e) {
             Toast.show('Erro ao gerar relatório!', 'error');
         }
@@ -1408,6 +1491,64 @@ const Reports = {
         </body></html>`;
 
         this._printHtml(html, 'Pedido_Reposicao');
+        this._salvarRelatorio('pedido', 'Pedido de Reposição — ' + today, html);
+    },
+
+
+    async gerarFolhaEmBranco() {
+        const brasao = await this.loadBrasao();
+        const today  = new Date().toLocaleDateString('pt-BR');
+        const user   = AppState.currentUser ? (AppState.currentUser.nome || AppState.currentUser.usuario) : '';
+        const headerHtml = await this._buildPdfHeader(brasao);
+
+        const html = `<!DOCTYPE html>
+<html><head><meta charset="utf-8">
+<style>
+  body{font-family:Arial,sans-serif;margin:40px;color:#222;}
+  .field-label{font-size:10px;text-transform:uppercase;letter-spacing:0.6px;color:#888;display:block;margin-bottom:4px;}
+  .field-line{border-bottom:1px solid #aaa;min-height:28px;margin-bottom:16px;}
+  .field-box{border:1px solid #aaa;border-radius:4px;min-height:80px;margin-bottom:16px;padding:8px;}
+  .field-box-lg{min-height:140px;}
+  .grid-2{display:grid;grid-template-columns:1fr 1fr;gap:24px;}
+  .grid-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:24px;}
+  .sec-title{background:#1a2744;color:#fff;font-weight:700;font-size:12px;padding:7px 12px;letter-spacing:0.5px;margin:20px 0 12px 0;}
+</style>
+</head><body>
+${headerHtml}
+<div style="display:flex;justify-content:space-between;margin-bottom:20px;align-items:flex-end;">
+    <h2 style="margin:0;font-size:16px;color:#1a2744;">Relatório de Serviço</h2>
+    <div style="text-align:right;">
+        <span style="font-size:11px;color:#777;display:block;">Emitido em: ${today}</span>
+        ${user ? '<span style="font-size:11px;color:#777;display:block;">Emitido por: ' + user + '</span>' : ''}
+    </div>
+</div>
+
+<div class="sec-title">Identificação do Chamado</div>
+<div class="grid-3">
+    <div><span class="field-label">Número O.S.</span><div class="field-line"></div></div>
+    <div><span class="field-label">Data de Solicitação</span><div class="field-line"></div></div>
+    <div><span class="field-label">Data de Conclusão</span><div class="field-line"></div></div>
+</div>
+
+<div class="sec-title">Dados do Solicitante</div>
+<div class="grid-2">
+    <div><span class="field-label">Nome / Setor</span><div class="field-line"></div></div>
+    <div><span class="field-label">Prioridade</span><div class="field-line"></div></div>
+</div>
+
+<div class="sec-title">Descrição do Problema</div>
+<div class="field-box field-box-lg"></div>
+
+<div class="sec-title">Relatório de Atividades Realizadas</div>
+<div class="field-box field-box-lg"></div>
+
+<div class="sec-title">Materiais / Peças Utilizadas</div>
+<div class="field-box"></div>
+
+${this._buildPdfFooter()}
+</body></html>`;
+
+        this._printHtml(html, 'Folha_Em_Branco');
     },
 
     _printHtml(html, filename) {
@@ -1458,7 +1599,7 @@ const Solicitacoes = {
             const term = searchTerm.toLowerCase();
             items = items.filter(s =>
                 (s.titulo || '').toLowerCase().includes(term) ||
-                (s.numero_so || '').toLowerCase().includes(term) ||
+                (s.numero_os || '').toLowerCase().includes(term) ||
                 (s.cliente_setor || '').toLowerCase().includes(term) ||
                 (s.descricao || '').toLowerCase().includes(term)
             );
