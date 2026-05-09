@@ -1233,7 +1233,6 @@ const Reports = {
         if (btnLimpar) btnLimpar.onclick = () => {
             Modal.confirm('Limpar Histórico', 'Deseja remover todos os relatórios salvos?', () => {
                 this.savedReports = [];
-                this._persistSalvos();
                 this.renderSalvos();
                 Toast.show('Histórico limpo!', 'info');
             });
@@ -1262,9 +1261,12 @@ const Reports = {
             usuario: AppState.currentUser ? (AppState.currentUser.nome || AppState.currentUser.usuario) : '',
             html
         };
-        this.savedReports.unshift(entry);
-        if (this.savedReports.length > 50) this.savedReports = this.savedReports.slice(0, 50);
-        this._persistSalvos();
+        // Getter retorna cópia nova a cada leitura — ler, modificar e gravar explicitamente
+        const lista = this.savedReports;
+        lista.unshift(entry);
+        if (lista.length > 50) lista.splice(50);
+        this.savedReports = lista; // setter grava no localStorage
+        Toast.show('Relatório salvo!', 'success');
     },
 
     renderSalvos() {
@@ -1306,8 +1308,8 @@ const Reports = {
     },
 
     excluirSalvo(id) {
-        this.savedReports = this.savedReports.filter(x => x.id !== id);
-        this._persistSalvos();
+        const lista = this.savedReports.filter(x => x.id !== id);
+        this.savedReports = lista;
         this.renderSalvos();
     },
 
