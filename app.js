@@ -979,6 +979,7 @@ const Services = {
     <div style="display:flex;justify-content:space-between;margin-bottom:18px;align-items:flex-end;">
         <h2 style="margin:0;font-size:16px;color:#1a2744;">Relatório de Serviço</h2>
         <div style="text-align:right;">
+            <span style="font-size:12px;color:#1a2744;font-weight:700;display:block;">Protocolo Nº ${Reports._gerarProtocolo()}</span>
             <span style="font-size:11px;color:#777;display:block;">Emitido em: ${today}</span>
             ${AppState.currentUser ? `<span style="font-size:11px;color:#777;display:block;">Emitido por: ${AppState.currentUser.nome || AppState.currentUser.usuario}</span>` : ''}
         </div>
@@ -1164,10 +1165,15 @@ const Reports = {
     },
 
     // ── RELATÓRIOS SALVOS ──
-    savedReports: JSON.parse(localStorage.getItem('setor_ti_salvos') || '[]'),
+    get savedReports() {
+        try { return JSON.parse(localStorage.getItem('setor_ti_salvos') || '[]'); } catch(e) { return []; }
+    },
+    set savedReports(val) {
+        try { localStorage.setItem('setor_ti_salvos', JSON.stringify(val)); } catch(e) {}
+    },
 
     _persistSalvos() {
-        try { localStorage.setItem('setor_ti_salvos', JSON.stringify(this.savedReports)); } catch(e) {}
+        // savedReports setter handles persistence automatically
     },
 
     _salvarRelatorio(tipo, titulo, html) {
@@ -1323,6 +1329,14 @@ const Reports = {
     },
 
     // ---- PDF GENERATION ----
+
+
+    _gerarProtocolo() {
+        const ano = new Date().getFullYear();
+        const ts  = Date.now();
+        const seq = String(ts).slice(-6);
+        return seq + '/' + ano;
+    },
 
     async _buildPdfHeader(brasao) {
         let headerHtml = '<div style="text-align:center;margin-bottom:24px;border-bottom:2px solid #1a2744;padding-bottom:16px;">';
@@ -1496,59 +1510,84 @@ const Reports = {
 
 
     async gerarFolhaEmBranco() {
-        const brasao = await this.loadBrasao();
-        const today  = new Date().toLocaleDateString('pt-BR');
-        const user   = AppState.currentUser ? (AppState.currentUser.nome || AppState.currentUser.usuario) : '';
+        const brasao   = await this.loadBrasao();
+        const today    = new Date().toLocaleDateString('pt-BR');
+        const user     = AppState.currentUser ? (AppState.currentUser.nome || AppState.currentUser.usuario) : '';
+        const protocolo = this._gerarProtocolo();
         const headerHtml = await this._buildPdfHeader(brasao);
 
         const html = `<!DOCTYPE html>
 <html><head><meta charset="utf-8">
 <style>
-  body{font-family:Arial,sans-serif;margin:40px;color:#222;}
-  .field-label{font-size:10px;text-transform:uppercase;letter-spacing:0.6px;color:#888;display:block;margin-bottom:4px;}
-  .field-line{border-bottom:1px solid #aaa;min-height:28px;margin-bottom:16px;}
-  .field-box{border:1px solid #aaa;border-radius:4px;min-height:80px;margin-bottom:16px;padding:8px;}
-  .field-box-lg{min-height:140px;}
-  .grid-2{display:grid;grid-template-columns:1fr 1fr;gap:24px;}
-  .grid-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:24px;}
-  .sec-title{background:#1a2744;color:#fff;font-weight:700;font-size:12px;padding:7px 12px;letter-spacing:0.5px;margin:20px 0 12px 0;}
+  *{box-sizing:border-box;}
+  body{font-family:Arial,sans-serif;margin:36px 40px;color:#222;font-size:13px;}
+  .header-sep{border-top:2px solid #1a2744;margin:16px 0 20px;}
+  .proto-block{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:18px;}
+  .proto-title{font-size:15px;font-weight:700;color:#1a2744;}
+  .proto-info{text-align:right;font-size:11px;color:#555;line-height:1.7;}
+  .proto-info strong{color:#1a2744;font-size:12px;}
+  table.meta{width:100%;border-collapse:collapse;margin-bottom:14px;}
+  table.meta td{border:1px solid #ccc;padding:8px 10px;font-size:11px;text-transform:uppercase;
+                letter-spacing:0.4px;color:#555;vertical-align:top;}
+  table.meta td .val{display:block;min-height:20px;margin-top:4px;color:#222;text-transform:none;
+                     letter-spacing:0;font-size:13px;}
+  .sec-box{border:1px solid #ccc;border-radius:3px;margin-bottom:14px;overflow:hidden;}
+  .sec-box-label{background:#f3f4f6;border-bottom:1px solid #ccc;padding:6px 10px;
+                 font-size:10px;text-transform:uppercase;letter-spacing:0.5px;color:#555;font-weight:700;}
+  .sec-box-lines{padding:10px;}
+  .write-line{border-bottom:1px solid #ddd;height:26px;margin-bottom:0;}
+  .footer-row{display:flex;justify-content:space-between;gap:16px;margin-top:32px;padding-top:16px;border-top:1px solid #ccc;}
+  .footer-cell{flex:1;text-align:center;font-size:11px;color:#444;}
+  .footer-cell .sig-line{border-top:1px solid #666;margin-bottom:5px;margin-top:36px;}
+  .footer-cell .date-box{border:1px solid #aaa;border-radius:3px;padding:4px 10px;
+                         display:inline-block;font-size:12px;letter-spacing:1px;}
 </style>
 </head><body>
 ${headerHtml}
-<div style="display:flex;justify-content:space-between;margin-bottom:20px;align-items:flex-end;">
-    <h2 style="margin:0;font-size:16px;color:#1a2744;">Relatório de Serviço</h2>
-    <div style="text-align:right;">
-        <span style="font-size:11px;color:#777;display:block;">Emitido em: ${today}</span>
-        ${user ? '<span style="font-size:11px;color:#777;display:block;">Emitido por: ' + user + '</span>' : ''}
-    </div>
+<div class="header-sep"></div>
+
+<div class="proto-block">
+  <div class="proto-title">Relatório / Ordem de Serviço</div>
+  <div class="proto-info">
+    <strong>Protocolo Nº ${protocolo}</strong><br>
+    Emitido em: ${today}<br>
+    ${user ? 'Emitido por: ' + user : ''}
+  </div>
 </div>
 
-<div class="sec-title">Identificação do Chamado</div>
-<div class="grid-3">
-    <div><span class="field-label">Número O.S.</span><div class="field-line"></div></div>
-    <div><span class="field-label">Data de Solicitação</span><div class="field-line"></div></div>
-    <div><span class="field-label">Data de Conclusão</span><div class="field-line"></div></div>
+<table class="meta">
+  <tr>
+    <td style="width:50%">Setor / Solicitante<span class="val"></span></td>
+    <td style="width:28%">Data de Solicitação<span class="val"></span></td>
+    <td style="width:22%">Prioridade<span class="val"></span></td>
+  </tr>
+  <tr>
+    <td colspan="3">Título / Assunto<span class="val"></span></td>
+  </tr>
+</table>
+
+<div class="sec-box">
+  <div class="sec-box-label">Descrição do Serviço / Problema Relatado</div>
+  <div class="sec-box-lines">
+    ${'<div class="write-line"></div>'.repeat(8)}
+  </div>
 </div>
 
-<div class="sec-title">Dados do Solicitante</div>
-<div class="grid-2">
-    <div><span class="field-label">Nome / Setor</span><div class="field-line"></div></div>
-    <div><span class="field-label">Prioridade</span><div class="field-line"></div></div>
+<div class="sec-box">
+  <div class="sec-box-label">Atividades Realizadas</div>
+  <div class="sec-box-lines">
+    ${'<div class="write-line"></div>'.repeat(8)}
+  </div>
 </div>
 
-<div class="sec-title">Descrição do Problema</div>
-<div class="field-box field-box-lg"></div>
-
-<div class="sec-title">Relatório de Atividades Realizadas</div>
-<div class="field-box field-box-lg"></div>
-
-<div class="sec-title">Materiais / Peças Utilizadas</div>
-<div class="field-box"></div>
-
-${this._buildPdfFooter()}
+<div class="footer-row">
+  <div class="footer-cell"><div class="sig-line"></div>Assinatura do Responsável</div>
+  <div class="footer-cell" style="flex:0.6;"><div class="sig-line"></div><span class="date-box">___/___/______</span><br>Data</div>
+  <div class="footer-cell"><div class="sig-line"></div>Assinatura de Recebido por</div>
+</div>
 </body></html>`;
 
-        this._printHtml(html, 'Folha_Em_Branco');
+        this._printHtml(html, 'Folha_Relatorio_' + protocolo.replace('/', '_'));
     },
 
     _printHtml(html, filename) {
