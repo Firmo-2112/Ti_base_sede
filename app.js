@@ -1659,7 +1659,7 @@ ${headerHtml}
 
 <div class="footer-row">
   <div class="footer-cell"><div class="sig-line"></div>Assinatura do Responsável</div>
-  <br><div class="footer-cell" style="flex:0.6;"><span class="date-box">___/___/______</span><br>Data</div>
+  <div class="footer-cell"><span class="date-box">___/___/______</span><br>Data</div>
   <div class="footer-cell"><div class="sig-line"></div>Assinatura de Recebido por</div>
 </div>
 </body></html>`;
