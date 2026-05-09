@@ -883,9 +883,35 @@
                         <textarea id="serviceDescription" required rows="4" placeholder="Descreva detalhadamente o serviço..."></textarea>
                     </div>
                 </div>
-                <div class="form-group">
+                <!-- Aviso para não-donos -->
+                <div id="serviceEditHint" class="service-edit-hint" style="display:none;">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                        <circle cx="12" cy="12" r="10"/>
+                        <line x1="12" y1="8" x2="12" y2="12"/>
+                        <line x1="12" y1="16" x2="12.01" y2="16"/>
+                    </svg>
+                    Você pode editar apenas o campo <strong>Relatório</strong>. Os demais campos são de responsabilidade do criador do serviço.
+                </div>
+                <!-- Campo Relatório para DONOS -->
+                <div class="form-group" id="serviceReportGroup">
                     <label for="serviceReport">Relatório</label>
                     <textarea id="serviceReport" rows="4" placeholder="Relatório detalhado das atividades realizadas e pendências..."></textarea>
+                </div>
+
+                <!-- Campo Relatório para NÃO-DONOS (append-only) -->
+                <div id="serviceReportAddBox" style="display:none;">
+                    <div class="form-group">
+                        <label>Relatório Existente</label>
+                        <div class="report-existing-box" id="serviceReportExisting"></div>
+                    </div>
+                    <div class="form-group">
+                        <label for="serviceReportAdd">
+                            Adicionar ao Relatório
+                            <span class="field-append-badge">Somente adição</span>
+                        </label>
+                        <textarea id="serviceReportAdd" rows="4"
+                            placeholder="Escreva aqui o que deseja adicionar ao relatório. Será registrado com seu nome e data automaticamente..."></textarea>
+                    </div>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-close="serviceModal">Cancelar</button>
@@ -914,6 +940,12 @@
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-close="viewServiceModal">Fechar</button>
+                    <button type="button" class="btn btn-primary" id="concludeFromViewBtn" style="display:none;">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15">
+                            <polyline points="20 6 9 17 4 12"/>
+                        </svg>
+                        Concluir
+                    </button>
                     <button type="button" class="btn btn-primary" id="editFromViewBtn">Editar</button>
                 </div>
             </div>
