@@ -166,6 +166,14 @@
                         </svg>
                     </span>
                 </div>
+                <div class="theme-toggle-container" style="margin-top:0.5rem;">
+                    <span class="theme-icon" title="Animação binária" style="font-size:0.6rem;letter-spacing:0.04em;color:var(--text-muted);font-family:monospace;">01</span>
+                    <label class="theme-switch">
+                        <input type="checkbox" id="matrixToggle" checked>
+                        <span class="slider"></span>
+                    </label>
+                    <span class="theme-icon" style="font-size:0.6rem;color:var(--text-muted);font-family:monospace;letter-spacing:0.04em;">BIN</span>
+                </div>
                 <div class="user-identity">
                     <div class="user-avatar" id="userAvatar">?</div>
                     <span class="user-avatar-name" id="userAvatarName"></span>
@@ -198,7 +206,6 @@
             <section class="tab-content active" id="dashboard-tab">
                 <div class="content-header">
                     <h2>Início</h2>
-                    <p class="subtitle">Visão geral do seu gerenciamento de TI</p>
                 </div>
                 
                 <div class="dashboard-grid">
@@ -313,7 +320,6 @@
             <section class="tab-content" id="inventory-tab">
                 <div class="content-header">
                     <h2>Gerenciador de Estoque</h2>
-                    <p class="subtitle">Controle de equipamentos, peças e suprimentos</p>
                 </div>
                 <div class="toolbar">
                     <div class="search-box">
@@ -378,7 +384,6 @@
             <section class="tab-content" id="snippets-tab">
                 <div class="content-header">
                     <h2>Códigos CMD & PowerShell</h2>
-                    <p class="subtitle">Biblioteca de comandos e scripts úteis</p>
                 </div>
                 <div class="toolbar">
                     <div class="search-box">
@@ -433,7 +438,6 @@
             <section class="tab-content" id="services-tab">
                 <div class="content-header">
                     <h2>Gerenciador de Serviços</h2>
-                    <p class="subtitle">Acompanhe atividades e serviços realizados</p>
                 </div>
                 <div class="toolbar">
                     <div class="search-box">
@@ -483,7 +487,6 @@
             <section class="tab-content" id="solicitacoes-tab">
                 <div class="content-header">
                     <h2>Solicitações de Serviço</h2>
-                    <p class="subtitle">Chamados recebidos pelo portal público</p>
                 </div>
                 <div class="toolbar">
                     <div class="search-box">
@@ -517,7 +520,6 @@
             <section class="tab-content" id="reports-tab">
                 <div class="content-header">
                     <h2>Relatórios</h2>
-                    <p class="subtitle">Gere e exporte relatórios em PDF</p>
                 </div>
 
                 <!-- Sub-tabs -->
@@ -553,7 +555,6 @@
                 <!-- ESTOQUE REPORT PANEL -->
                 <div class="report-panel active" id="report-panel-estoque">
                     <div class="report-preview-header">
-                        <p class="report-desc">Gera uma lista completa do estoque atual organizada por categoria, contendo nome e quantidade de cada item.</p>
                         <button class="btn btn-primary" id="btnGerarEstoque">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                 <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
@@ -577,7 +578,6 @@
                 <!-- SERVIÇOS REPORT PANEL -->
                 <div class="report-panel" id="report-panel-servicos">
                     <div class="report-preview-header">
-                        <p class="report-desc">Gera uma lista dos serviços registrados contendo título, setor/cliente, data e descrição.</p>
                         <div class="report-filter-row">
                             <select id="reportServicosFilter" class="filter-select">
                                 <option value="">Todos os Status</option>
@@ -617,7 +617,6 @@
                 <!-- PEDIDO REPORT PANEL -->
                 <div class="report-panel" id="report-panel-pedido">
                     <div class="report-preview-header">
-                        <p class="report-desc">Monte uma lista personalizada de itens para pedido de reposição de estoque.</p>
                     </div>
                     <div class="pedido-layout">
                         <!-- Form to add items -->
@@ -692,7 +691,6 @@
                 <!-- SALVOS PANEL -->
                 <div class="report-panel" id="report-panel-salvos">
                     <div class="report-preview-header" style="justify-content:space-between;">
-                        <p class="report-desc">Histórico dos relatórios gerados. Clique em "Abrir" para reimprimir qualquer relatório salvo.</p>
                         <button class="btn btn-secondary" id="btnLimparSalvos">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                 <polyline points="3 6 5 6 21 6"/>
