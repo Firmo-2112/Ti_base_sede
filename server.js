@@ -325,32 +325,45 @@ app.put('/api/servicos/:id', requireAuth, async (req, res) => {
     const nomeUsr = getUserNome(req);
     const idUsr   = getUserId(req);
     try {
-        let dono = {};
-        try {
-            const [existing] = await pool.execute('SELECT criado_por,usuario_id FROM servicos WHERE id=?',[id]);
-            if (!existing.length) return res.status(404).json({ error: 'Serviço não encontrado' });
-            dono = existing[0];
-        } catch (e2) {
-            const [existing] = await pool.execute('SELECT id FROM servicos WHERE id=?',[id]);
-            if (!existing.length) return res.status(404).json({ error: 'Serviço não encontrado' });
+        const [existing] = await pool.execute(
+            'SELECT criado_por, usuario_id, titulo, cliente_setor, prioridade, data_servico, descricao FROM servicos WHERE id=?', [id]
+        );
+        if (!existing.length) return res.status(404).json({ error: 'Serviço não encontrado' });
+        const svc = existing[0];
+        const isDono = !svc.usuario_id || String(svc.usuario_id) === String(idUsr);
+
+        if (isDono) {
+            // Dono — pode editar tudo
+            try {
+                await pool.execute(
+                    'UPDATE servicos SET titulo=?,cliente_setor=?,prioridade=?,data_servico=?,descricao=?,relatorio=?,modificado_por=? WHERE id=?',
+                    [titulo, cliente_setor||'', prioridade||'media', data_servico||null, descricao, relatorio||'', nomeUsr, id]
+                );
+            } catch (e2) {
+                await pool.execute(
+                    'UPDATE servicos SET titulo=?,cliente_setor=?,prioridade=?,data_servico=?,descricao=?,relatorio=? WHERE id=?',
+                    [titulo, cliente_setor||'', prioridade||'media', data_servico||null, descricao, relatorio||'', id]
+                );
+            }
+            await logActivity('services', 'edit', 'Editado serviço: ' + titulo, nomeUsr, idUsr, null);
+        } else {
+            // Outro usuário — edita APENAS o campo relatorio, preserva todo o resto
+            try {
+                await pool.execute(
+                    'UPDATE servicos SET relatorio=?,modificado_por=? WHERE id=?',
+                    [relatorio||'', nomeUsr, id]
+                );
+            } catch (e2) {
+                await pool.execute('UPDATE servicos SET relatorio=? WHERE id=?', [relatorio||'', id]);
+            }
+            await logActivity('services', 'edit', 'Relatório editado: ' + svc.titulo, nomeUsr, idUsr, null);
         }
-        if (dono.usuario_id && dono.usuario_id !== idUsr)
-            return res.status(403).json({ error: 'Apenas o responsável pode editar este serviço.' });
-        try {
-            await pool.execute(
-                'UPDATE servicos SET titulo=?,cliente_setor=?,prioridade=?,data_servico=?,descricao=?,relatorio=?,modificado_por=? WHERE id=?',
-                [titulo, cliente_setor||'', prioridade||'media', data_servico||null, descricao, relatorio||'', nomeUsr, id]
-            );
-        } catch (e2) {
-            await pool.execute(
-                'UPDATE servicos SET titulo=?,cliente_setor=?,prioridade=?,data_servico=?,descricao=?,relatorio=? WHERE id=?',
-                [titulo, cliente_setor||'', prioridade||'media', data_servico||null, descricao, relatorio||'', id]
-            );
-        }
-        await logActivity('services','edit','Editado serviço: '+titulo, nomeUsr, idUsr, null);
-        const [u] = await pool.execute('SELECT * FROM servicos WHERE id=?',[id]);
+        const [u] = await pool.execute('SELECT * FROM servicos WHERE id=?', [id]);
         res.json(u[0]);
-    } catch (err) { res.status(500).json({ error: 'Erro ao editar serviço' }); }
+    } catch (err) {
+        console.error('PUT servicos error:', err);
+        res.status(500).json({ error: 'Erro ao editar serviço' });
+    }
 });
 
 app.patch('/api/servicos/:id/concluir', requireAuth, async (req, res) => {
@@ -358,24 +371,19 @@ app.patch('/api/servicos/:id/concluir', requireAuth, async (req, res) => {
     const nomeUsr = getUserNome(req);
     const idUsr   = getUserId(req);
     try {
-        let dono = {}; let titulo = '';
+        const [existing] = await pool.execute('SELECT titulo FROM servicos WHERE id=?', [id]);
+        if (!existing.length) return res.status(404).json({ error: 'Serviço não encontrado' });
+        const titulo = existing[0].titulo;
+        // Qualquer usuário autenticado pode concluir — salva concluido_por
         try {
-            const [existing] = await pool.execute('SELECT criado_por,usuario_id,titulo FROM servicos WHERE id=?',[id]);
-            if (!existing.length) return res.status(404).json({ error: 'Serviço não encontrado' });
-            dono = existing[0]; titulo = existing[0].titulo;
+            await pool.execute(
+                'UPDATE servicos SET status=?, data_conclusao=NOW(), concluido_por=? WHERE id=?',
+                ['completed', nomeUsr, id]
+            );
         } catch (e2) {
-            const [existing] = await pool.execute('SELECT titulo FROM servicos WHERE id=?',[id]);
-            if (!existing.length) return res.status(404).json({ error: 'Serviço não encontrado' });
-            titulo = existing[0].titulo;
+            await pool.execute('UPDATE servicos SET status=?, data_conclusao=NOW() WHERE id=?', ['completed', id]);
         }
-        if (dono.usuario_id && dono.usuario_id !== idUsr)
-            return res.status(403).json({ error: 'Apenas o responsável pode concluir este serviço.' });
-        try {
-            await pool.execute('UPDATE servicos SET status=?,data_conclusao=NOW(),modificado_por=? WHERE id=?',['completed', nomeUsr, id]);
-        } catch (e2) {
-            await pool.execute('UPDATE servicos SET status=?,data_conclusao=NOW() WHERE id=?',['completed', id]);
-        }
-        await logActivity('services','complete','Concluído: '+titulo, nomeUsr, idUsr, null);
+        await logActivity('services', 'complete', 'Concluído por ' + nomeUsr + ': ' + titulo, nomeUsr, idUsr, null);
         res.json({ success: true });
     } catch (err) { res.status(500).json({ error: 'Erro ao concluir serviço' }); }
 });
