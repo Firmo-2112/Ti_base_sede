@@ -2806,3 +2806,35 @@ html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
     align-items: center;
     flex-shrink: 0;
 }
+
+/* ── O.S. PREFIX BADGE no campo Descrição de Serviço ── */
+.os-prefix-wrapper {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+}
+
+.os-prefix-badge {
+    display: inline-flex;
+    align-items: center;
+    align-self: flex-start;
+    padding: 0.2rem 0.6rem;
+    background: var(--primary-dim);
+    border: 1px solid var(--border-bright);
+    border-bottom: none;
+    border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+    font-family: 'Space Mono', monospace;
+    font-size: 0.625rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    color: var(--primary);
+    text-shadow: 0 0 8px var(--primary-glow);
+    cursor: default;
+    user-select: none;
+}
+
+.os-prefix-wrapper textarea {
+    border-top-left-radius: 0 !important;
+    border-top-right-radius: var(--radius-md) !important;
+}
