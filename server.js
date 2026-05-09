@@ -52,6 +52,7 @@ async function runMigrations() {
         { table: 'servicos',   col: 'criado_por',    def: 'VARCHAR(100) DEFAULT NULL' },
         { table: 'servicos',   col: 'modificado_por',def: 'VARCHAR(100) DEFAULT NULL' },
         { table: 'servicos',   col: 'usuario_id',    def: 'INT DEFAULT NULL' },
+        { table: 'servicos',   col: 'concluido_por', def: 'VARCHAR(100) DEFAULT NULL' },
     ];
     // Criar tabela solicitacoes se não existir
     try {
@@ -434,20 +435,36 @@ app.put('/api/configuracoes/:chave', requireAuth, async (req, res) => {
     } catch (err) { res.status(500).json({ error: 'Erro ao salvar configuração' }); }
 });
 
+// Cache das colunas existentes em 'atividades' para evitar INSERT duplo
+let _atividadesColsVerified = false;
+let _atividadesHasExtras    = false;
+
 async function logActivity(tipo, acao, detalhes, usuarioNome, usuarioId, snapshot) {
     try {
-        try {
+        // Verificar colunas uma única vez por sessão do servidor
+        if (!_atividadesColsVerified) {
+            try {
+                const [cols] = await pool.execute(
+                    "SELECT COLUMN_NAME FROM information_schema.COLUMNS " +
+                    "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'atividades' AND COLUMN_NAME = 'usuario_nome'"
+                );
+                _atividadesHasExtras    = cols.length > 0;
+                _atividadesColsVerified = true;
+            } catch(e) { _atividadesColsVerified = true; }
+        }
+
+        if (_atividadesHasExtras) {
             await pool.execute(
-                'INSERT INTO atividades (tipo,acao,detalhes,usuario_nome,usuario_id,snapshot) VALUES (?,?,?,?,?,?)',
-                [tipo, acao, detalhes, usuarioNome||null, usuarioId||null, snapshot ? JSON.stringify(snapshot) : null]
+                'INSERT INTO atividades (tipo,acao,detalhes,usuario_nome,usuario_id) VALUES (?,?,?,?,?)',
+                [tipo, acao, detalhes, usuarioNome||null, usuarioId||null]
             );
-        } catch (e2) {
+        } else {
             await pool.execute(
                 'INSERT INTO atividades (tipo,acao,detalhes) VALUES (?,?,?)',
                 [tipo, acao, detalhes]
             );
         }
-    } catch (err) { console.error('Erro ao registrar atividade:', err); }
+    } catch (err) { console.error('Erro ao registrar atividade:', err.message); }
 }
 
 // ==========================================
@@ -583,6 +600,9 @@ async function startServer() {
         console.log('Conectado ao MySQL (Railway)');
         conn.release();
         await runMigrations();
+        // Pré-aquecer cache do logActivity após migração
+        _atividadesColsVerified = true;
+        _atividadesHasExtras    = true; // migração garante que as colunas existem
     } catch (err) {
         console.error('Banco indisponível no boot:', err.message);
         // Start anyway — health check must respond
