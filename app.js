@@ -878,16 +878,39 @@ const Services = {
     openEditModal(id) {
         const service = AppState.services.find(s => String(s.id) === String(id));
         if (!service) return;
-        document.getElementById('serviceModalTitle').textContent = 'Editar Serviço';
+
+        const curId  = AppState.currentUser && AppState.currentUser.id;
+        const isDono = !service.usuario_id || String(service.usuario_id) === String(curId);
+
+        document.getElementById('serviceModalTitle').textContent = isDono ? 'Editar Serviço' : 'Adicionar Relatório';
         document.getElementById('serviceId').value = service.id;
-        document.getElementById('serviceTitle').value = service.titulo;
-        document.getElementById('serviceClient').value = service.cliente_setor || '';
+
+        // Campos bloqueados para não-donos
+        const lockedFields = ['serviceTitle','serviceClient','servicePriority','serviceDate'];
+        lockedFields.forEach(fId => {
+            const el = document.getElementById(fId);
+            if (!el) return;
+            if (isDono) {
+                el.removeAttribute('disabled');
+                el.removeAttribute('readonly');
+                el.style.opacity = '';
+                el.style.cursor  = '';
+            } else {
+                el.setAttribute('disabled', 'true');
+                el.style.opacity = '0.55';
+                el.style.cursor  = 'not-allowed';
+            }
+        });
+
+        document.getElementById('serviceTitle').value    = service.titulo;
+        document.getElementById('serviceClient').value   = service.cliente_setor || '';
         document.getElementById('servicePriority').value = service.prioridade || 'media';
-        document.getElementById('serviceDate').value = service.data_servico ? service.data_servico.split('T')[0] : '';
-        // Extrair O.S. da descrição existente e exibir badge (não editável)
+        document.getElementById('serviceDate').value     = service.data_servico ? service.data_servico.split('T')[0] : '';
+
+        // O.S. badge na descrição
         const rawDesc = service.descricao || '';
         const osMatch = rawDesc.match(/^\[O\.S\. ([^\]]+)\] ?/);
-        const badge = document.getElementById('osDescBadge');
+        const badge   = document.getElementById('osDescBadge');
         if (osMatch) {
             const prefix = osMatch[0];
             Services._currentOsPrefix = prefix;
@@ -895,15 +918,60 @@ const Services = {
             document.getElementById('serviceDescription').value = rawDesc;
             document.getElementById('serviceDescription').setAttribute('data-os-prefix', prefix);
         } else {
-            // Serviço antigo sem O.S. — gerar nova e prefixar
-            const os = Services._gerarOS();
+            const os     = Services._gerarOS();
             const prefix = '[O.S. ' + os + '] ';
             Services._currentOsPrefix = prefix;
             if (badge) badge.textContent = 'O.S. ' + os;
             document.getElementById('serviceDescription').value = prefix + rawDesc;
             document.getElementById('serviceDescription').setAttribute('data-os-prefix', prefix);
         }
-        document.getElementById('serviceReport').value = service.relatorio || '';
+
+        // Descrição: bloqueada para não-donos (além do guard de O.S.)
+        const descEl = document.getElementById('serviceDescription');
+        if (!isDono) {
+            descEl.setAttribute('disabled', 'true');
+            descEl.style.opacity = '0.55';
+            descEl.style.cursor  = 'not-allowed';
+        } else {
+            descEl.removeAttribute('disabled');
+            descEl.style.opacity = '';
+            descEl.style.cursor  = '';
+        }
+
+        // Relatório
+        const reportEl = document.getElementById('serviceReport');
+        const reportExistingEl = document.getElementById('serviceReportExisting');
+        const reportAddBox     = document.getElementById('serviceReportAddBox');
+        const reportAddEl      = document.getElementById('serviceReportAdd');
+
+        if (isDono) {
+            // Dono: campo único editável normalmente
+            reportEl.removeAttribute('disabled');
+            reportEl.style.opacity = '';
+            reportEl.style.cursor  = '';
+            reportEl.value = service.relatorio || '';
+            if (reportAddBox) reportAddBox.style.display = 'none';
+            document.getElementById('serviceReportGroup').style.display = 'block';
+        } else {
+            // Não-dono: exibir conteúdo existente em readonly + caixa de adição
+            document.getElementById('serviceReportGroup').style.display = 'none';
+            if (reportAddBox) {
+                reportAddBox.style.display = 'block';
+                // Conteúdo atual (readonly)
+                if (reportExistingEl) {
+                    reportExistingEl.textContent = service.relatorio || 'Nenhum relatório registrado ainda.';
+                }
+                // Limpar caixa de adição
+                if (reportAddEl) reportAddEl.value = '';
+                // Guardar relatorio atual para concatenar no save
+                reportAddBox.setAttribute('data-existing', service.relatorio || '');
+            }
+        }
+
+        // Aviso visual para não-donos
+        const hint = document.getElementById('serviceEditHint');
+        if (hint) hint.style.display = isDono ? 'none' : 'flex';
+
         Modal.open('serviceModal');
     },
 
@@ -920,19 +988,27 @@ const Services = {
         const authEl = document.getElementById('viewServiceAuthorship');
         if (authEl) {
             let authHtml = '';
-            if (service.criado_por) authHtml += '<span class="service-emitido-por">Emitido por: ' + Inventory.escapeHtml(service.criado_por) + '</span>';
-            if (service.modificado_por) authHtml += '<span class="service-modificado-por">Modificado por: ' + Inventory.escapeHtml(service.modificado_por) + '</span>';
+            if (service.criado_por)   authHtml += '<span class="service-auth-tag auth-criado">✦ Criado por: '    + Inventory.escapeHtml(service.criado_por)   + '</span>';
+            if (service.modificado_por) authHtml += '<span class="service-auth-tag auth-editado">✎ Editado por: ' + Inventory.escapeHtml(service.modificado_por) + '</span>';
+            if (service.concluido_por)  authHtml += '<span class="service-auth-tag auth-concluido">✔ Concluído por: ' + Inventory.escapeHtml(service.concluido_por) + '</span>';
             authEl.innerHTML = authHtml;
             authEl.style.display = authHtml ? 'flex' : 'none';
         }
-        // Mostrar/ocultar botão Editar conforme ownership (loose equality)
-        const curIdView = AppState.currentUser && AppState.currentUser.id;
-        const isOwnerView = !service.usuario_id || String(service.usuario_id) === String(curIdView);
+        // Botão Editar: todos podem abrir (não-donos verão campos bloqueados)
+        const curIdView    = AppState.currentUser && AppState.currentUser.id;
+        const isOwnerView  = !service.usuario_id || String(service.usuario_id) === String(curIdView);
         const editFromViewBtn = document.getElementById('editFromViewBtn');
         if (editFromViewBtn) {
-            editFromViewBtn.style.display = isOwnerView ? 'inline-flex' : 'none';
+            editFromViewBtn.style.display = 'inline-flex';
+            editFromViewBtn.textContent   = isOwnerView ? 'Editar' : 'Adicionar Relatório';
             const svcId = service.id;
             editFromViewBtn.onclick = () => { Modal.close('viewServiceModal'); Services.openEditModal(svcId); };
+        }
+        // Botão Concluir no modal de visualização
+        const concludeViewBtn = document.getElementById('concludeFromViewBtn');
+        if (concludeViewBtn) {
+            concludeViewBtn.style.display = service.status === 'pending' ? 'inline-flex' : 'none';
+            concludeViewBtn.onclick = () => { Modal.close('viewServiceModal'); Services.completeService(service.id); };
         }
         Modal.open('viewServiceModal');
     },
@@ -951,12 +1027,43 @@ const Services = {
                 // Garantir que o prefixo O.S. nunca foi removido pelo usuário
                 return pfx && !val.startsWith(pfx) ? pfx + val.replace(/^\[O\.S\.[^\]]*\] ?/, '') : val;
             })().trim(),
-            relatorio: document.getElementById('serviceReport').value.trim()
+            relatorio: (() => {
+                const isDono2 = (() => {
+                    const svc = AppState.services.find(s => String(s.id) === String(document.getElementById('serviceId').value));
+                    if (!svc) return true;
+                    const cId = AppState.currentUser && AppState.currentUser.id;
+                    return !svc.usuario_id || String(svc.usuario_id) === String(cId);
+                })();
+                if (isDono2) {
+                    return document.getElementById('serviceReport').value.trim();
+                } else {
+                    // Não-dono: concatenar novo texto ao existente
+                    const addBox  = document.getElementById('serviceReportAddBox');
+                    const addEl   = document.getElementById('serviceReportAdd');
+                    const existing = (addBox && addBox.getAttribute('data-existing')) || '';
+                    const newText  = addEl ? addEl.value.trim() : '';
+                    if (!newText) return existing;
+                    const user = AppState.currentUser ? (AppState.currentUser.nome || AppState.currentUser.usuario) : 'Usuário';
+                    const now  = new Date().toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
+                    const sep  = '\n\n─── ' + user + ' · ' + now + ' ───\n';
+                    return existing ? existing + sep + newText : newText;
+                }
+            })()
         };
 
-        if (!serviceData.titulo || !serviceData.descricao) {
+        const svcForVal = AppState.services.find(s => String(s.id) === String(id));
+        const isDonoVal = !id || !svcForVal || !svcForVal.usuario_id ||
+            String(svcForVal.usuario_id) === String(AppState.currentUser && AppState.currentUser.id);
+        if (isDonoVal && (!serviceData.titulo || !serviceData.descricao)) {
             Toast.show('Preencha os campos obrigatórios!', 'error');
             return;
+        }
+        if (!isDonoVal) {
+            const addEl = document.getElementById('serviceReportAdd');
+            if (!addEl || !addEl.value.trim()) {
+                Toast.show('Escreva algo no campo de adição ao relatório!', 'error');
+                return;
+            }
         }
 
         try {
@@ -1058,6 +1165,7 @@ const Services = {
             <span style="font-size:12px;color:#1a2744;font-weight:700;display:block;">Protocolo Nº ${Reports._gerarProtocolo()}</span>
             <span style="font-size:11px;color:#777;display:block;">Emitido em: ${today}</span>
             ${AppState.currentUser ? `<span style="font-size:11px;color:#777;display:block;">Emitido por: ${AppState.currentUser.nome || AppState.currentUser.usuario}</span>` : ''}
+            ${service.concluido_por ? `<span style="font-size:11px;color:#777;display:block;">Concluído por: ${Inventory.escapeHtml(service.concluido_por)}</span>` : ''}
         </div>
     </div>
 
@@ -1138,11 +1246,14 @@ const Services = {
                 // Use == (loose equality) — usuario_id may come as string or number
                 const isOwnerForActions = !service.usuario_id || String(service.usuario_id) === String(curId);
                 let actionsHtml = '<div class="service-card-actions" onclick="event.stopPropagation()">';
+                // Editar: todos podem — não-donos só editam relatório
+                actionsHtml += '<button class="btn btn-sm btn-secondary" onclick="Services.openEditModal(\'' + service.id + '\')">' + (isOwnerForActions ? 'Editar' : 'Relatório') + '</button>';
+                // Concluir: qualquer usuário pode
+                if (service.status === 'pending') {
+                    actionsHtml += '<button class="btn btn-sm btn-primary" onclick="Services.completeService(\'' + service.id + '\')">Concluir</button>';
+                }
+                // Excluir: apenas dono
                 if (isOwnerForActions) {
-                    actionsHtml += '<button class="btn btn-sm btn-secondary" onclick="Services.openEditModal(\'' + service.id + '\')">Editar</button>';
-                    if (service.status === 'pending') {
-                        actionsHtml += '<button class="btn btn-sm btn-primary" onclick="Services.completeService(\'' + service.id + '\')">Concluir</button>';
-                    }
                 }
                 actionsHtml += '<button class="btn btn-sm btn-pdf" onclick="Services.gerarPdfServico(\'' + service.id + '\')" title="Gerar PDF deste serviço">'
                     + '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px;margin-right:3px;">'
@@ -1151,9 +1262,12 @@ const Services = {
                     + '<line x1="12" y1="15" x2="12" y2="3"/>'
                     + '</svg>PDF</button>';
                 actionsHtml += '</div>';
-                const emitidoPor = service.criado_por ? '<span class="service-emitido-por">Emitido por: ' + Inventory.escapeHtml(service.criado_por) + '</span>' : '';
-                const modificadoPor = service.modificado_por ? '<span class="service-modificado-por">Modificado por: ' + Inventory.escapeHtml(service.modificado_por) + '</span>' : '';
-                return '<div class="service-card" onclick="Services.viewService(\'' + service.id + '\')"><div class="service-card-header"><h4 class="service-title">' + Inventory.escapeHtml(service.titulo) + '</h4><span class="service-status-badge ' + service.status + '">' + statusLabel + '</span></div><div class="service-meta">' + (service.cliente_setor ? '<span>' + Inventory.escapeHtml(service.cliente_setor) + '</span>' : '') + '<span class="service-priority ' + service.prioridade + '">' + priorityLabel + '</span><span>' + date + '</span></div><p class="service-description">' + Inventory.escapeHtml(service.descricao) + '</p>' + (emitidoPor || modificadoPor ? '<div class="service-authorship">' + emitidoPor + modificadoPor + '</div>' : '') + actionsHtml + '</div>';
+                const authTags = [
+                    service.criado_por   ? '<span class="service-auth-tag auth-criado">✦ Criado por: '    + Inventory.escapeHtml(service.criado_por)   + '</span>' : '',
+                    service.modificado_por ? '<span class="service-auth-tag auth-editado">✎ Editado por: ' + Inventory.escapeHtml(service.modificado_por) + '</span>' : '',
+                    service.concluido_por  ? '<span class="service-auth-tag auth-concluido">✔ Concluído por: ' + Inventory.escapeHtml(service.concluido_por) + '</span>' : '',
+                ].filter(Boolean).join('');
+                return '<div class="service-card" onclick="Services.viewService(\'' + service.id + '\')"><div class="service-card-header"><h4 class="service-title">' + Inventory.escapeHtml(service.titulo) + '</h4><span class="service-status-badge ' + service.status + '">' + statusLabel + '</span></div><div class="service-meta">' + (service.cliente_setor ? '<span>' + Inventory.escapeHtml(service.cliente_setor) + '</span>' : '') + '<span class="service-priority ' + service.prioridade + '">' + priorityLabel + '</span><span>' + date + '</span></div><p class="service-description">' + Inventory.escapeHtml(service.descricao) + '</p>' + (authTags ? '<div class="service-authorship">' + authTags + '</div>' : '') + actionsHtml + '</div>';
             }).join('');
         }
     }
@@ -1614,11 +1728,11 @@ const Reports = {
                  font-size:10px;text-transform:uppercase;letter-spacing:0.5px;color:#555;font-weight:700;}
   .sec-box-lines{padding:10px;}
   .write-line{border-bottom:1px solid #ddd;height:26px;margin-bottom:0;}
-  .footer-row{display:flex;justify-content:space-between;gap:16px;margin-top:32px;padding-top:16px;border-top:0px solid #ccc;}
+  .footer-row{display:flex;justify-content:space-between;gap:16px;margin-top:32px;padding-top:16px;border-top:1px solid #ccc;}
   .footer-cell{flex:1;text-align:center;font-size:11px;color:#444;}
   .footer-cell .sig-line{border-top:1px solid #666;margin-bottom:5px;margin-top:36px;}
   .footer-cell .date-box{border:1px solid #aaa;border-radius:3px;padding:4px 10px;
-                         display:inline-block;font-size:12px;letter-spacing:1px;margin-top:14px;text-align:center;}
+                         display:inline-block;font-size:12px;letter-spacing:1px;text-align:center;margin-top:15px;}
 </style>
 </head><body>
 ${headerHtml}
