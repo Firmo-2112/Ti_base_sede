@@ -1,4 +1,5 @@
 @import url('https://fonts.googleapis.com/css2?family=Oxanium:wght@300;400;500;600;700;800&family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Inter:wght@300;400;500;600&display=swap');
+
 :root {
     --primary:        #00d4ff;
     --primary-dim:    rgba(0, 212, 255, 0.12);
@@ -2836,4 +2837,82 @@ html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
 .os-prefix-wrapper textarea {
     border-top-left-radius: 0 !important;
     border-top-right-radius: var(--radius-md) !important;
+}
+
+/* ── AUTH TAGS nos cards/modais de serviço ── */
+.service-authorship {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.375rem;
+    margin-bottom: 0.75rem;
+    padding-top: 0.5rem;
+    border-top: 1px solid var(--border-subtle);
+}
+
+.service-auth-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.15rem 0.55rem;
+    border-radius: 20px;
+    font-size: 0.625rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    white-space: nowrap;
+}
+
+.auth-criado    { background: var(--primary-dim);  color: var(--primary); }
+.auth-editado   { background: var(--accent-dim);   color: #a78bfa; }
+.auth-concluido { background: var(--success-dim);  color: var(--success); }
+
+/* ── HINT para não-donos no modal de edição ── */
+.service-edit-hint {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.6rem;
+    padding: 0.75rem 1rem;
+    background: rgba(245, 158, 11, 0.08);
+    border: 1px solid rgba(245, 158, 11, 0.25);
+    border-radius: var(--radius-md);
+    font-size: 0.8125rem;
+    color: var(--warning);
+    margin-bottom: 0.5rem;
+    line-height: 1.5;
+}
+
+.service-edit-hint svg { flex-shrink: 0; margin-top: 1px; }
+.service-edit-hint strong { color: var(--text-bright); }
+
+/* ── RELATÓRIO APPEND-ONLY (não-donos) ── */
+.report-existing-box {
+    background: var(--bg-void);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    padding: 0.75rem 1rem;
+    font-size: 0.8125rem;
+    color: var(--text-secondary);
+    line-height: 1.7;
+    white-space: pre-wrap;
+    word-break: break-word;
+    max-height: 140px;
+    overflow-y: auto;
+    opacity: 0.75;
+    cursor: not-allowed;
+    font-style: italic;
+}
+
+.field-append-badge {
+    display: inline-flex;
+    align-items: center;
+    margin-left: 0.5rem;
+    padding: 0.1rem 0.45rem;
+    background: rgba(245, 158, 11, 0.12);
+    border: 1px solid rgba(245, 158, 11, 0.3);
+    border-radius: 10px;
+    font-size: 0.5625rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--warning);
+    vertical-align: middle;
 }
