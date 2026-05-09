@@ -1731,7 +1731,7 @@ const Reports = {
   .footer-row{display:flex;justify-content:space-between;gap:16px;margin-top:32px;padding-top:16px;border-top:1px solid #ccc;}
   .footer-cell{flex:1;text-align:center;font-size:11px;color:#444;}
   .footer-cell .sig-line{border-top:1px solid #666;margin-bottom:5px;margin-top:36px;}
-  .footer-cell .date-box{border:1px solid #aaa;border-radius:3px;padding:4px 10px;
+  .footer-cell .date-box{border:0px solid #aaa;border-radius:0px;padding:4px 10px;
                          display:inline-block;font-size:12px;letter-spacing:1px;text-align:center;margin-top:15px;}
 </style>
 </head><body>
