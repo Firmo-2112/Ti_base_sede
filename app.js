@@ -1622,7 +1622,6 @@ const Reports = {
 </style>
 </head><body>
 ${headerHtml}
-<div class="header-sep"></div>
 
 <div class="proto-block">
   <div class="proto-title">Relatório / Ordem de Serviço</div>
@@ -1647,20 +1646,20 @@ ${headerHtml}
 <div class="sec-box">
   <div class="sec-box-label">Descrição do Serviço / Problema Relatado</div>
   <div class="sec-box-lines">
-    ${'<div class="write-line"></div>'.repeat(8)}
+    ${'<div class="write-line"></div>'.repeat(7)}
   </div>
 </div>
 
 <div class="sec-box">
   <div class="sec-box-label">Atividades Realizadas</div>
   <div class="sec-box-lines">
-    ${'<div class="write-line"></div>'.repeat(8)}
+    ${'<div class="write-line"></div>'.repeat(7)}
   </div>
 </div>
 
 <div class="footer-row">
   <div class="footer-cell"><div class="sig-line"></div>Assinatura do Responsável</div>
-  <div class="footer-cell" style="flex:0.6;"><div class="sig-line"></div><span class="date-box">___/___/______</span><br>Data</div>
+  <div class="footer-cell" style="flex:0.6;"><span class="date-box">___/___/______</span><br>Data</div>
   <div class="footer-cell"><div class="sig-line"></div>Assinatura de Recebido por</div>
 </div>
 </body></html>`;
