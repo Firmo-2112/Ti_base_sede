@@ -814,13 +814,65 @@ const Services = {
         document.getElementById('statusFilter').addEventListener('change', (e) => {
             this.render(document.getElementById('servicesSearch').value, e.target.value);
         });
+
+        // Proteger prefixo O.S. na descrição contra edição
+        document.getElementById('serviceDescription').addEventListener('input', function() {
+            const prefix = this.getAttribute('data-os-prefix');
+            if (prefix && !this.value.startsWith(prefix)) {
+                // Restaurar prefixo se o usuário tentou deletar
+                const cur = this.selectionStart;
+                this.value = prefix + this.value.replace(/^\[O\.S\.[^\]]*\] ?/, '');
+                const newPos = Math.max(prefix.length, cur);
+                this.setSelectionRange(newPos, newPos);
+            }
+        });
+        document.getElementById('serviceDescription').addEventListener('keydown', function(e) {
+            const prefix = this.getAttribute('data-os-prefix');
+            if (!prefix) return;
+            const sel = this.selectionStart;
+            // Bloquear backspace/delete dentro do prefixo
+            if ((e.key === 'Backspace' && sel <= prefix.length) ||
+                (e.key === 'Delete'    && sel < prefix.length)) {
+                e.preventDefault();
+            }
+            // Bloquear posicionamento do cursor antes do prefixo
+            if (sel < prefix.length && !['ArrowRight','ArrowDown','End','Tab'].includes(e.key)) {
+                setTimeout(() => this.setSelectionRange(prefix.length, prefix.length), 0);
+            }
+        });
+        document.getElementById('serviceDescription').addEventListener('click', function() {
+            const prefix = this.getAttribute('data-os-prefix');
+            if (prefix && this.selectionStart < prefix.length) {
+                this.setSelectionRange(prefix.length, prefix.length);
+            }
+        });
     },
 
     openAddModal() {
         document.getElementById('serviceModalTitle').textContent = 'Novo Serviço';
         document.getElementById('serviceForm').reset();
         document.getElementById('serviceId').value = '';
+        // Gerar O.S. automática para novo serviço
+        const os = Services._gerarOS();
+        const prefix = '[O.S. ' + os + '] ';
+        Services._currentOsPrefix = prefix;
+        const badge = document.getElementById('osDescBadge');
+        if (badge) badge.textContent = 'O.S. ' + os;
+        const descEl = document.getElementById('serviceDescription');
+        descEl.value = prefix;
+        descEl.setAttribute('data-os-prefix', prefix);
+        // Posicionar cursor após o prefixo
+        setTimeout(() => {
+            descEl.focus();
+            descEl.setSelectionRange(prefix.length, prefix.length);
+        }, 100);
         Modal.open('serviceModal');
+    },
+
+    _gerarOS() {
+        const ano  = new Date().getFullYear();
+        const seq  = String(Date.now()).slice(-6);
+        return seq + '/' + ano;
     },
 
     openEditModal(id) {
@@ -832,7 +884,25 @@ const Services = {
         document.getElementById('serviceClient').value = service.cliente_setor || '';
         document.getElementById('servicePriority').value = service.prioridade || 'media';
         document.getElementById('serviceDate').value = service.data_servico ? service.data_servico.split('T')[0] : '';
-        document.getElementById('serviceDescription').value = service.descricao || '';
+        // Extrair O.S. da descrição existente e exibir badge (não editável)
+        const rawDesc = service.descricao || '';
+        const osMatch = rawDesc.match(/^\[O\.S\. ([^\]]+)\] ?/);
+        const badge = document.getElementById('osDescBadge');
+        if (osMatch) {
+            const prefix = osMatch[0];
+            Services._currentOsPrefix = prefix;
+            if (badge) badge.textContent = 'O.S. ' + osMatch[1];
+            document.getElementById('serviceDescription').value = rawDesc;
+            document.getElementById('serviceDescription').setAttribute('data-os-prefix', prefix);
+        } else {
+            // Serviço antigo sem O.S. — gerar nova e prefixar
+            const os = Services._gerarOS();
+            const prefix = '[O.S. ' + os + '] ';
+            Services._currentOsPrefix = prefix;
+            if (badge) badge.textContent = 'O.S. ' + os;
+            document.getElementById('serviceDescription').value = prefix + rawDesc;
+            document.getElementById('serviceDescription').setAttribute('data-os-prefix', prefix);
+        }
         document.getElementById('serviceReport').value = service.relatorio || '';
         Modal.open('serviceModal');
     },
@@ -874,7 +944,13 @@ const Services = {
             cliente_setor: document.getElementById('serviceClient').value.trim(),
             prioridade: document.getElementById('servicePriority').value,
             data_servico: document.getElementById('serviceDate').value || null,
-            descricao: document.getElementById('serviceDescription').value.trim(),
+            descricao: (() => {
+                const el    = document.getElementById('serviceDescription');
+                const val   = el.value;
+                const pfx   = el.getAttribute('data-os-prefix') || '';
+                // Garantir que o prefixo O.S. nunca foi removido pelo usuário
+                return pfx && !val.startsWith(pfx) ? pfx + val.replace(/^\[O\.S\.[^\]]*\] ?/, '') : val;
+            })().trim(),
             relatorio: document.getElementById('serviceReport').value.trim()
         };
 
