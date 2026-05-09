@@ -1,36 +1,73 @@
-// FUNDO BINÁRIO
+// ==========================================
+// FUNDO BINÁRIO — com toggle on/off
+// ==========================================
 const canvas = document.getElementById('matrix');
-const ctx = canvas.getContext('2d'); 
+const ctx    = canvas.getContext('2d');
 
 canvas.height = window.innerHeight;
-canvas.width = window.innerWidth;
+canvas.width  = window.innerWidth;
 
-const letters = '01';
+const letters  = '01';
 const fontSize = 14;
-const columns = canvas.width / fontSize;
 
-const drops = [];
-for(let x=0;x<columns;x++) drops[x]=1;
+let matrixDrops    = [];
+let matrixInterval = null;
+let matrixActive   = localStorage.getItem('setor_ti_matrix') !== 'off';
 
-function draw(){
-ctx.fillStyle = 'rgba(0,0,0,0.05)';
-ctx.fillRect(0,0,canvas.width,canvas.height);
-
-ctx.fillStyle = '#00d4ff';
-ctx.font = fontSize+'px monospace';
-
-for(let i=0;i<drops.length;i++){
-const text = letters[Math.floor(Math.random()*letters.length)];
-ctx.fillText(text,i*fontSize,drops[i]*fontSize);
-
-if(drops[i]*fontSize>canvas.height && Math.random()>0.975)
-drops[i]=0;
-
- drops[i]++;
-}
+function matrixInitDrops() {
+    const cols = Math.floor(canvas.width / fontSize);
+    matrixDrops = [];
+    for (let x = 0; x < cols; x++) matrixDrops[x] = 1;
 }
 
-setInterval(draw,33);
+function draw() {
+    ctx.fillStyle = 'rgba(0,0,0,0.05)';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = '#00d4ff';
+    ctx.font = fontSize + 'px monospace';
+    for (let i = 0; i < matrixDrops.length; i++) {
+        const text = letters[Math.floor(Math.random() * letters.length)];
+        ctx.fillText(text, i * fontSize, matrixDrops[i] * fontSize);
+        if (matrixDrops[i] * fontSize > canvas.height && Math.random() > 0.975) matrixDrops[i] = 0;
+        matrixDrops[i]++;
+    }
+}
+
+function matrixStart() {
+    if (matrixInterval) return;
+    canvas.style.opacity = '';
+    matrixInitDrops();
+    matrixInterval = setInterval(draw, 33);
+}
+
+function matrixStop() {
+    if (matrixInterval) { clearInterval(matrixInterval); matrixInterval = null; }
+    // Fade canvas to transparent
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    canvas.style.opacity = '0';
+}
+
+function matrixSetState(active, save = true) {
+    matrixActive = active;
+    if (save) localStorage.setItem('setor_ti_matrix', active ? 'on' : 'off');
+    const toggle = document.getElementById('matrixToggle');
+    if (toggle) toggle.checked = active;
+    active ? matrixStart() : matrixStop();
+}
+
+// Init on load
+matrixInitDrops();
+if (matrixActive) {
+    matrixInterval = setInterval(draw, 33);
+} else {
+    canvas.style.opacity = '0';
+}
+
+window.addEventListener('resize', () => {
+    canvas.height = window.innerHeight;
+    canvas.width  = window.innerWidth;
+    matrixInitDrops();
+});
 
 
 
@@ -284,6 +321,15 @@ const LoginManager = {
             AppState.settings.theme = tema;
             try { await API.put('/api/configuracoes/tema', { valor: tema }); } catch(e) {}
         });
+
+        // Matrix toggle — ligar/desligar animação binária
+        const matrixToggleEl = document.getElementById('matrixToggle');
+        if (matrixToggleEl) {
+            matrixToggleEl.checked = matrixActive;
+            matrixToggleEl.addEventListener('change', () => {
+                matrixSetState(matrixToggleEl.checked);
+            });
+        }
 
         Navigation.init();
         Dashboard.setupQuickActions();
@@ -1736,6 +1782,7 @@ const Reports = {
 </style>
 </head><body>
 ${headerHtml}
+<div class="header-sep"></div>
 
 <div class="proto-block">
   <div class="proto-title">Relatório / Ordem de Serviço</div>
@@ -1773,7 +1820,7 @@ ${headerHtml}
 
 <div class="footer-row">
   <div class="footer-cell"><div class="sig-line"></div>Assinatura do Responsável</div>
-  <div class="footer-cell" style="flex:0.6;"><span class="date-box">___/___/______<br>Data</span></div>
+  <div class="footer-cell" style="flex:0.6;"></div><span class="date-box">___/___/______<br>Data</span></div>
   <div class="footer-cell"><div class="sig-line"></div>Assinatura de Recebido por</div>
 </div>
 </body></html>`;
