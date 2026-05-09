@@ -1618,7 +1618,7 @@ const Reports = {
   .footer-cell{flex:1;text-align:center;font-size:11px;color:#444;}
   .footer-cell .sig-line{border-top:1px solid #666;margin-bottom:5px;margin-top:36px;}
   .footer-cell .date-box{border:1px solid #aaa;border-radius:3px;padding:4px 10px;
-                         display:inline-block;font-size:12px;letter-spacing:1px;}
+                         display:inline-block;font-size:12px;letter-spacing:1px;margin-top:36px;}
 </style>
 </head><body>
 ${headerHtml}
@@ -1659,7 +1659,7 @@ ${headerHtml}
 
 <div class="footer-row">
   <div class="footer-cell"><div class="sig-line"></div>Assinatura do Responsável</div>
-  <div class="footer-cell" style="flex:1.5;"><span class="date-box">___/___/______</span><br>Data</div>
+  <div class="footer-cell" style="flex:0.6;"><span class="date-box">___/___/______<br>Data</span></div>
   <div class="footer-cell"><div class="sig-line"></div>Assinatura de Recebido por</div>
 </div>
 </body></html>`;
